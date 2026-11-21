@@ -503,3 +503,17 @@ What looked like faults but were not:
   stored n−1 = address .(9+n) = video port 4399+n.
 - Two transmitters both set to 02 shared address .11 and port 4401 (telnet reset, streams mixed).
 - "not support scaling up ... src 1280x720": logged, yet the 720p picture showed.
+
+## A busy vB transmitter loses every keyframe (2026-11-21 18:45, read-only)
+
+One 12/2025 (vB) transmitter showing a busy text console delivered 0 complete frames in two
+minutes: 60 keyframes "unterminated" at 101–136 KB, each a different size, while the other
+three transmitters on the same path decoded without a single loss. On the same path at the same
+time the gateway's NIC (`rx_no_buffer_count`, `rx_missed_errors`) and every switch port's drop
+and overflow counters stayed flat. On the unit itself the CPU was 0 % idle (load ~15):
+`hdmi_convertor` 45 %, `trans` 36 %. So this time the loss is most likely inside the sender:
+the update service's busy loop starves the encoder/streamer, and only frames big enough
+(detailed screen content) lose fragments. Inference; it revises the "network loss" conclusion
+above for this case, where the network was measured clean. Not fixable without writing to the
+unit (stopping `trans`), which needs the owner's go-ahead; a lower source resolution or
+simpler screen content makes the frames smaller.

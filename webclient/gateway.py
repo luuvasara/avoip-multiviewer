@@ -179,6 +179,11 @@ class Matrix:
             print("waking: viewer back, rejoining the transmitters", flush=True)
             self.asleep = False
             self.join()
+            # Nothing was observed while asleep: restart the forget clock, so the
+            # known channels stay listed while video and probes come back.
+            now = time.monotonic()
+            for n in self.listed:
+                self.listed[n] = now
 
     def _drain(self, n, s):
         try:
@@ -406,6 +411,8 @@ class Matrix:
     def shown(self, n):
         """Listed on the page: its video or its probe answers have lasted DISCOVER_S
         without a break, and the last such moment is under FORGET_S ago."""
+        if self.asleep:               # not listening: keep the list as it was
+            return n in self.listed
         now = time.monotonic()
         steady = ((self.active(n) and now - self.run_since.get(n, now) >= DISCOVER_S) or
                   (self.is_present(n) and now - self.probe_since.get(n, now) >= DISCOVER_S))
