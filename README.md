@@ -174,6 +174,14 @@ their pictures mix. The gateway needs:
   [IGMP](https://en.wikipedia.org/wiki/Internet_Group_Management_Protocol) querier, or the
   switch stops forwarding the groups the gateway joins, and old-revision receivers lose their
   picture. Tested with snooping off.
+- **Watch out for unmanaged switches that snoop IGMP anyway.** Many cheap "unmanaged" switches
+  have IGMP snooping built in and cannot turn it off. Without a querier they forget a port's
+  membership a few minutes after the last join, and the gateway's tiles go blank while the
+  extenders' own receivers (on other switches) still work. Seen here on 2026-11-21: the managed
+  switch sent 6 Mbit/s of video toward the gateway's room, an unmanaged switch there passed
+  4 packets/s, and restarting the gateway (a fresh join) brought the video back at once. The
+  gateway therefore re-sends its IGMP membership report every 60 s (`IGMP_REFRESH_S`), the same
+  report Linux would send if a querier asked.
 - **A dedicated VLAN is strongly advised.** With snooping off, every transmitter's video goes to
   every port of the VLAN, and the units accept passwordless root telnet logins from anything on
   that network.
@@ -220,6 +228,7 @@ setting with an example.
 | `LISTEN` | `0.0.0.0:8820` | Page address; `127.0.0.1:8820` when the proxy runs on the same host |
 | `HOST_NAME` | `gateway` | Name of this host in the page header |
 | `OCR_LANG` | `eng` | Tesseract language(s) for Copy text, ex. `eng+fin` (install the language pack) |
+| `IGMP_REFRESH_S` | `60` | Re-announce the gateway's multicast join every so many seconds (0 = off). Keeps video flowing through switches that snoop IGMP when no querier is on the network; see [Network](#network) |
 | `TYPE_GAP_MS` | `20` | Pause after each key report when typing text; raise it if characters go missing |
 | `IDLE_SECS` | `120` | Stop everything after this long with no visible page; `0` = never |
 | `RENDER_DEVICE` | `/dev/dri/renderD128` | GPU used for encoding |

@@ -50,6 +50,11 @@ WAKE_GAP = 2          # seconds between wake taps per transmitter
 TYPE_MAX = 20000      # characters per "type" request
 TYPE_GAP = float(os.environ.get("TYPE_GAP_MS", 20)) / 1000   # default pause after each key report
 OCR_LANG = os.environ.get("OCR_LANG", "eng")    # Tesseract language(s), ex. eng+fin
+# Re-announce the multicast join this often (seconds; 0 = off). Linux reports a
+# join only when it happens and then only in answer to an IGMP query; a switch
+# with IGMP snooping and no querier on the network (ex. many unmanaged switches)
+# forgets the membership after a few minutes and stops forwarding the video.
+IGMP_REFRESH = float(os.environ.get("IGMP_REFRESH_S", 60))
 OCR_MAX_BYTES = 4 * 1024 * 1024
 OCR_MAX_PIXELS = 25_000_000   # PNG width x height; the page sends at most ~10 MP
 
@@ -118,6 +123,40 @@ class Matrix:
             s.setblocking(False)
             self.loop.add_reader(s.fileno(), self._drain, n, s)
             self.socks[n] = s
+
+    def igmp_report(self):
+        """Send one IGMPv3 membership report for GROUP, exactly what the kernel
+        sends when a querier asks (RFC 3376 4.2: record type 2, MODE_IS_EXCLUDE,
+        no sources; to 224.0.0.22, TTL 1, Router Alert option)."""
+        rec = bytes([2, 0, 0, 0]) + socket.inet_aton(GROUP)
+        msg = bytearray(bytes([0x22, 0, 0, 0, 0, 0, 0, 1]) + rec)
+        c = sum(int.from_bytes(msg[i:i + 2], "big") for i in range(0, len(msg), 2))
+        while c >> 16:
+            c = (c & 0xFFFF) + (c >> 16)
+        msg[2:4] = (~c & 0xFFFF).to_bytes(2, "big")
+        s = socket.socket(socket.AF_INET, socket.SOCK_RAW, socket.IPPROTO_IGMP)
+        try:
+            s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_TTL, 1)
+            s.setsockopt(socket.IPPROTO_IP, socket.IP_MULTICAST_IF, socket.inet_aton(self.iface))
+            s.setsockopt(socket.IPPROTO_IP, socket.IP_OPTIONS, bytes([0x94, 4, 0, 0]))
+            s.sendto(bytes(msg), ("224.0.0.22", 0))
+        finally:
+            s.close()
+
+    async def igmp_refresh(self):
+        warned = False
+        while True:
+            await asyncio.sleep(IGMP_REFRESH)
+            if not self.socks:
+                continue                  # not joined (idle): nothing to keep alive
+            try:
+                self.igmp_report()
+                warned = False
+            except OSError as e:          # ex. no CAP_NET_RAW: say so once, keep running
+                if not warned:
+                    print(f"IGMP refresh failed ({e}); video may stop behind a snooping "
+                          "switch without a querier. Set IGMP_REFRESH_S=0 to silence.", flush=True)
+                    warned = True
 
     def leave(self):
         for s in self.socks.values():
@@ -766,6 +805,8 @@ async def on_start(app):
     app["probe"] = asyncio.create_task(m.probe())
     app["info"] = asyncio.create_task(m.poll_info())
     app["air"] = asyncio.create_task(m.watch_air())
+    if IGMP_REFRESH > 0:
+        app["igmp"] = asyncio.create_task(m.igmp_refresh())
 
 
 async def on_stop(app):
@@ -773,6 +814,8 @@ async def on_stop(app):
     app["probe"].cancel()
     app["info"].cancel()
     app["air"].cancel()
+    if "igmp" in app:
+        app["igmp"].cancel()
     await app["http"].close()
     for n in list(app["m"].procs):
         app["m"].stop(n)
