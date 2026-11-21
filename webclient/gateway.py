@@ -209,7 +209,8 @@ class Matrix:
     STICKERS = {("4465df48", None): "11/2024",          # TX4, 192.168.167.13
                 ("4465df48", "f94552d5"): "12/2025"}    # TX2 and TX5
     # Model name printed on the units' labels, where the owner has read it.
-    LABELS = {("4465df48", None): "HKE12MMA20"}         # the 11/2024 units
+    LABELS = {("4465df48", None): "HKE12MMA20",         # 11/2024 unit: no suffix
+              ("4465df48", "f94552d5"): "HKE12MMA20-TX"}  # 12/2025 unit
     VARIANT_KEYS = ("role", "kernel", "kernel_build", "kernel_date", "smp", "app_md5", "upd_md5")
 
     def _variant(self, st):

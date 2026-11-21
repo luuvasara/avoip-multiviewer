@@ -439,11 +439,12 @@ ours; TESmart does not define the term.
 - So whatever TESmart's upgrade changes, it is not in the video, player or IGMP code of either
   side that we can see. It may be on the receiver side, in the switch-facing timing of IGMP messages, or something
   delivered later through the update service. Not determined.
-- **The sticker rule and TESmart's own judgement disagree.** Our 11/2024 units carry the full model
-  label **HKE12MMA20** (the earlier name), and TESmart confirmed these need its upgrade, yet by the
-  FAQ's rule (after June 2024 = new) they would be "new version". In this set the model name on the
-  label, not the sticker date, tells old from new. If unsure, ask TESmart with both the label and
-  the sticker date.
+- **Labels and the sticker rule.** Both our transmitters carry the earlier model name on their
+  label: the 12/2025 one reads **HKE12MMA20-TX**, the 11/2024 one plain **HKE12MMA20** (no
+  suffix). TESmart said our older units need its upgrade, yet by the FAQ's rule (after June 2024
+  = new) 11/2024 would be "new version", so the rule and TESmart's judgement disagree here.
+  Whether the missing "-TX" suffix marks the old revision we cannot tell from two units. If unsure,
+  ask TESmart with the full label and the sticker date.
 
 Details: [docs/firmware-internals.md](docs/firmware-internals.md).
 

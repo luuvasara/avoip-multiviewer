@@ -466,8 +466,15 @@ new units), probed read-only with `tools/probe-rx-compare.txt` (raw output kept 
 
 ### Labels (owner's reading, 2026-11-21)
 
-The 11/2024 units are labelled with the full model name **HKE12MMA20** (TESmart's earlier name for
-the HKE120-EH23), and these are the units TESmart confirmed need the upgrade, although their sticker
-date is after June 2024, which the FAQ's rule calls "new". So the label, not the sticker date,
-separates old from new in this set. The page shows the label in the hardware-variant tooltip
-(`LABELS` in `webclient/gateway.py`).
+Corrected 2026-11-21 17:56 after comparing the units side by side:
+
+| Transmitter | Model label | Inspection sticker | Build |
+|---|---|---|---|
+| vB (with `trans`) | **HKE12MMA20-TX** | 25/12 (December 2025) | 4465df48 + trans f94552d5 |
+| vA (no `trans`) | **HKE12MMA20** (no suffix) | 24/11 (November 2024) | 4465df48 |
+
+Both carry the earlier model name, so the name alone does not separate old from new (an earlier
+note here said it did; wrong). TESmart said the owner's older units need the upgrade, yet the
+FAQ's rule calls 11/2024 "new". Whether the missing "-TX" suffix marks the old revision is not
+decidable from two units. The page shows the label in the hardware-variant tooltip (`LABELS` in
+`webclient/gateway.py`).
