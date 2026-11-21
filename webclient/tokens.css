@@ -1,0 +1,75 @@
+/* TESmart KVM web client — design tokens. Single source of truth for every value.
+   Pages use the SEMANTIC tier only; primitives are referenced only from here. */
+@layer primitives, semantic, components;
+
+@layer primitives {
+  :root {
+    --gray-1000: #000000;   /* video letterbox only: true black is correct behind video */
+    --gray-950: #121417;
+    --gray-900: #1a1d22;
+    --gray-800: #23272e;
+    --gray-700: #343a44;
+    --gray-400: #a3abb7;
+    --gray-100: #e6e8eb;
+    --blue-400: #4fc3f7;
+    --green-500: #3fb950;
+    --amber-500: #d29922;
+    --red-500: #f23f43;
+    --scrim-60: rgb(10 12 15 / 0.6);
+
+    --size-4: 4px;  --size-8: 8px;  --size-16: 16px;
+    --size-24: 24px; --size-32: 32px; --size-48: 48px;
+    --type-12: 12px; --type-14: 14px; --type-16: 16px; --type-20: 20px;
+    --font-sans-stack: system-ui, "Segoe UI", Roboto, "Noto Sans", sans-serif;
+    --font-mono-stack: ui-monospace, "SFMono-Regular", "DejaVu Sans Mono", monospace;
+  }
+}
+
+@layer semantic {
+  :root {
+    color-scheme: dark;
+    --color-bg: var(--gray-950);
+    --color-surface: var(--gray-900);
+    --color-surface-raised: var(--gray-800);
+    --color-border: var(--gray-700);
+    --color-text: var(--gray-100);
+    --color-text-muted: var(--gray-400);
+    --color-accent: var(--blue-400);        /* hover / keyboard focus */
+    --color-ok: var(--green-500);           /* live signal, link up */
+    --color-warn: var(--amber-500);         /* starting, reconnecting */
+    --color-tally: var(--red-500);          /* the source you are controlling */
+    --color-video-bg: var(--gray-1000);
+    --color-scrim: var(--scrim-60);
+
+    --space-xs: var(--size-4);
+    --space-sm: var(--size-8);
+    --space-md: var(--size-16);
+    --space-lg: var(--size-24);
+    --space-xl: var(--size-32);
+    --space-2xl: var(--size-48);
+    --radius-sm: var(--size-4);
+    --radius-md: var(--size-8);
+    --border-w: 1px;
+    --tally-w: 3px;
+
+    --text-sm: var(--type-12);
+    --text-md: var(--type-14);
+    --text-lg: var(--type-16);
+    --text-xl: var(--type-20);
+    --font-ui: var(--font-sans-stack);
+    --font-mono: var(--font-mono-stack);
+    --line-body: 1.5;
+    --tile-min: 420px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .spinner, .progress--indeterminate { animation-duration: 2.5s !important;
+                                       animation-iteration-count: infinite !important; }
+}

@@ -1,0 +1,3 @@
+echo "== SNMP =="; grep Udp: /proc/net/snmp; echo ---A---
+echo "== WMEM =="; cat /proc/sys/net/core/wmem_default /proc/sys/net/core/wmem_max /proc/sys/net/core/rmem_default /proc/sys/net/ipv4/udp_wmem_min; cat /proc/sys/net/ipv4/udp_mem; echo ---B---
+echo "== QDISC =="; cat /sys/class/net/eth0/tx_queue_len; cat /sys/class/net/eth0/speed /sys/class/net/eth0/duplex 2>/dev/null; cat /proc/net/dev | grep eth0; cat /proc/net/udp 2>/dev/null | head; uptime; echo ---C---

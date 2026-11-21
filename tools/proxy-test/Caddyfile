@@ -1,0 +1,22 @@
+# Test reverse proxy for tools/access-test.sh style checks: the gateway under a
+# path prefix, with a stand-in for an auth gateway that sets Remote-User.
+# :8830 strips /kvm (gateway BASE_PATH empty); :8831 keeps it (BASE_PATH=/kvm).
+{
+	auto_https off
+	admin off
+}
+:8830 {
+	redir /kvm /kvm/
+	handle_path /kvm/* {
+		reverse_proxy 127.0.0.1:8821 {
+			header_up Remote-User demo-user
+		}
+	}
+}
+:8831 {
+	handle /kvm* {
+		reverse_proxy 127.0.0.1:8822 {
+			header_up Remote-User demo-user
+		}
+	}
+}

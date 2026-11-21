@@ -1,0 +1,7 @@
+.venv
+captures
+.git
+**/__pycache__
+*.pcap
+deploy/.env
+deploy/*.env

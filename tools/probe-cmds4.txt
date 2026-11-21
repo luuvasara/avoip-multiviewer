@@ -1,0 +1,8 @@
+echo "== TOOLS =="; which strings nc tftp md5sum hexdump ftpput wget dd od 2>/dev/null; echo ---A---
+echo "== MD5 =="; md5sum /customer/hdmiap/* /customer/hdmiplayer/* 2>/dev/null | grep -v core; echo ---B---
+echo "== IGMP =="; cat /proc/net/igmp; echo "force all:"; cat /proc/sys/net/ipv4/conf/all/force_igmp_version; echo "force eth0:"; cat /proc/sys/net/ipv4/conf/eth0/force_igmp_version; echo ---C---
+echo "== MI MODULES =="; ls /proc/mi_modules/ /proc/mi_modules/mi_venc/ 2>/dev/null; echo ---D---
+echo "== VENC0 =="; cat /proc/mi_modules/mi_venc/mi_venc0 2>/dev/null | head -150; echo ---E---
+echo "== STR CONV =="; strings /customer/hdmiap/hdmi_convertor 2>/dev/null | grep -i -E 'slice|super|maxi|max_i|bufsize|buf_size|ROW_CNT|MULTI|BIT_RATE|GOP|QP|RC_' | head -80; echo ---F---
+echo "== STR TRANS =="; strings /customer/hdmiap/trans 2>/dev/null | grep -i -E 'buf|size|igmp|multicast|239\.|frame|trunc|too|large|overflow|slice|nal|rtsp' | head -100; echo ---G---
+echo "== NET =="; ifconfig eth0; uptime; ps | grep -v '\]$' | head -40; echo ---H---

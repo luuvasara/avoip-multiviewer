@@ -1,0 +1,10 @@
+{
+  "rules": {
+    "declaration-property-value-allowed-list": {
+      "/^(padding|margin|gap|border-radius|font-size|inline-size|block-size|min-inline-size|min-block-size|inset)$/": [
+        "/^(var\\(--[a-z0-9-]+\\)|0|auto|inherit|50%|100%)( (var\\(--[a-z0-9-]+\\)|0|auto|50%|100%)){0,3}$/",
+        "/^calc\\(/"
+      ]
+    }
+  }
+}

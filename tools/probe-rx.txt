@@ -1,0 +1,4 @@
+echo "== PLAYER LS =="; ls -la /customer/hdmiplayer 2>/dev/null; echo ---A---
+echo "== RUN SCRIPT =="; cat /customer/hdmiplayer/run.eth0.dhcp.203.ip.sh 2>/dev/null; echo ---B---
+echo "== RTSP_CLIENT_HDMI.ini =="; cat /customer/hdmiplayer/RTSP_CLIENT_HDMI.ini 2>/dev/null; echo ---C---
+echo "== TRANS LOCATION =="; ls -la /customer/trans 2>/dev/null; echo ---D---

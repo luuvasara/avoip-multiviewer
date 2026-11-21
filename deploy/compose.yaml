@@ -1,0 +1,59 @@
+# Web KVM multiviewer. Settings come from deploy/.env (copy .env.example).
+#   docker compose -f deploy/compose.yaml up -d --build
+# Page:   http://<this host>:8820/            (or behind your reverse proxy)
+# Video:  WebRTC media on UDP 8189 from this host to the browser (see README)
+name: kvm-multiviewer
+services:
+  mediamtx:
+    image: bluenviron/mediamtx:1.21.4
+    network_mode: host
+    restart: unless-stopped
+    environment:
+      MTX_RTSPADDRESS: 127.0.0.1:8554          # feeds publish locally only
+      MTX_RTSPTRANSPORTS: tcp
+      MTX_RTMP: "no"
+      MTX_HLS: "no"
+      MTX_SRT: "no"
+      MTX_API: "no"
+      MTX_MOQ: "no"                            # 1.21 enables MoQ on :8892/:8893 by default, unauthenticated
+      # Signalling (WHEP) only via the gateway, which applies the login.
+      MTX_WEBRTCADDRESS: 127.0.0.1:8889
+      MTX_WEBRTCLOCALUDPADDRESS: :${WEBRTC_UDP_PORT:-8189}
+      MTX_WEBRTCLOCALTCPADDRESS: ${WEBRTC_TCP_ADDRESS:-}
+      MTX_WEBRTCIPSFROMINTERFACESLIST: ${NIC:?set NIC in deploy/.env}
+      MTX_WEBRTCADDITIONALHOSTS: ${WEBRTC_ADDITIONAL_HOSTS:-}
+  kvm:
+    build: { context: .., dockerfile: deploy/Dockerfile }
+    network_mode: host                         # multicast joins + raw source address
+    restart: unless-stopped
+    cap_add: [NET_ADMIN]                       # NIC alias + rx ring, see entrypoint.sh
+    devices: ["${RENDER_DEVICE:-/dev/dri/renderD128}:/dev/dri/renderD128"]
+    tmpfs: [/run/kvm]
+    volumes: ["kvm-state:/var/lib/kvm"]       # unit facts, generated password
+    environment:
+      NIC: ${NIC:?set NIC in deploy/.env}
+      HID_IP: ${HID_IP:-192.168.167.3}
+      LISTEN: ${LISTEN:-0.0.0.0:8820}
+      HOST_NAME: ${HOST_NAME:-gateway}
+      IDLE_SECS: ${IDLE_SECS:-120}
+      LIBVA_DRIVER_NAME: ${LIBVA_DRIVER_NAME:-}
+      BASE_PATH: ${BASE_PATH:-}
+      # Login (README, "Reverse proxy and login"). Default: built-in password.
+      KVM_AUTH: ${KVM_AUTH:-basic}
+      KVM_USER: ${KVM_USER:-kvm}
+      KVM_PASS: ${KVM_PASS:-}
+      KVM_TOKENS: ${KVM_TOKENS:-}
+      TRUSTED_PROXIES: ${TRUSTED_PROXIES:-127.0.0.1/32,::1/128}
+      AUTH_USER_HEADER: ${AUTH_USER_HEADER:-}
+      AUTH_ALLOWED_USERS: ${AUTH_ALLOWED_USERS:-}
+      AUTH_JWKS_URL: ${AUTH_JWKS_URL:-}
+      AUTH_JWT_HEADER: ${AUTH_JWT_HEADER:-}
+      AUTH_JWT_AUDIENCE: ${AUTH_JWT_AUDIENCE:-}
+      AUTH_JWT_ISSUER: ${AUTH_JWT_ISSUER:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+      # Optional: copy each feed (video only) to another RTSP server as <base>/tx<n>
+      PUBLISH_BASE: ${PUBLISH_BASE:-}
+      STREAM_STATE_URL: ${STREAM_STATE_URL:-}
+    depends_on: [mediamtx]
+volumes:
+  kvm-state:

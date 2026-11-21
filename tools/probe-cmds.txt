@@ -1,0 +1,19 @@
+id; echo ---id---
+uname -a; echo ---uname---
+cat /proc/version; echo ---version---
+cat /proc/cpuinfo; echo ---cpuinfo---
+cat /proc/mtd; echo ---mtd---
+cat /etc/os-release 2>/dev/null; cat /etc/issue 2>/dev/null; echo ---os---
+busybox 2>&1 | head -1; echo ---busybox---
+cat /proc/uptime; echo ---uptime---
+cat /proc/meminfo | head -5; echo ---mem---
+df -h 2>/dev/null; echo ---df---
+mount; echo ---mount---
+ps w 2>/dev/null || ps; echo ---ps---
+ls -la /; echo ---root---
+ls -la /etc; echo ---etc---
+ls -la /bin /sbin /usr/bin /usr/sbin 2>/dev/null; echo ---bins---
+ifconfig -a 2>/dev/null; echo ---ifconfig---
+cat /proc/net/igmp 2>/dev/null; echo ---igmp---
+cat /proc/net/dev 2>/dev/null; echo ---netdev---
+dmesg 2>/dev/null | tail -120; echo ---dmesg---

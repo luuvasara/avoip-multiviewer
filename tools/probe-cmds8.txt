@@ -1,0 +1,5 @@
+echo "== VER =="; cat /proc/version; cat /proc/loadavg; echo ---A---
+echo "== TOP =="; top -b -n1 | head -12; sleep 2; top -b -n1 | head -8; echo ---B---
+echo "== LISTEN =="; netstat -ltnup; echo ---C---
+echo "== IGMP =="; cat /proc/net/igmp; echo ---D---
+echo "== DEMO TAIL =="; tail -5 /customer/demo.sh; md5sum /customer/demo.sh /customer/config_file; cat /customer/config_file; echo; ps | grep -c strings; echo ---E---

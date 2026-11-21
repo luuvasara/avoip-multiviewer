@@ -1,0 +1,1 @@
+echo "==HEXBEGIN=="; hexdump -v -e '32/1 "%02x" "\n"' /customer/trans; echo "==HEXEND=="

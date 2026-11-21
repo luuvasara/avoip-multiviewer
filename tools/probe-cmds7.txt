@@ -1,0 +1,3 @@
+echo "== LISTEN =="; netstat -ltnup 2>/dev/null || netstat -ltnu; echo ---A---
+echo "== DEMO =="; cat /customer/demo.sh; echo ---B---
+echo "==HEXBEGIN=="; hexdump -v -e '32/1 "%02x" "\n"' /customer/hdmiap/hdmi_convertor; echo "==HEXEND=="

@@ -1,0 +1,7 @@
+echo "== HDMIAP LS =="; ls -la /customer/hdmiap 2>/dev/null; echo ---A---
+echo "== RUN SCRIPT =="; cat /customer/hdmiap/run.eth0.dhcp.337.ip.sh 2>/dev/null; echo ---B---
+echo "== ENCODER INI (2M_AUDIO) =="; cat /customer/hdmiap/2M_AUDIO.ini 2>/dev/null; echo ---C---
+echo "== ALL INIS LIST =="; ls -la /customer/hdmiap/*.ini 2>/dev/null; echo ---D---
+echo "== IP ADDR+ROUTE =="; ip addr 2>/dev/null; echo "--routes--"; ip route 2>/dev/null; echo ---E---
+echo "== VERSION =="; find /customer -iname '*ver*' 2>/dev/null; cat /customer/hdmiap/version* 2>/dev/null; cat /customer/hdmiap/*.txt 2>/dev/null | head -40; echo ---F---
+echo "== RUN SCRIPTS AVAIL =="; ls -la /customer/hdmiap/run* 2>/dev/null; echo ---G---

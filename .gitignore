@@ -1,0 +1,4 @@
+deploy/.env
+captures/
+.venv/
+__pycache__/

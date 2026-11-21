@@ -1,0 +1,312 @@
+/* TESmart KVM multiviewer — page styles. Semantic tokens from tokens.css only. */
+@layer components {
+  *, *::before, *::after { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+
+  html, body { margin: 0; height: 100%; }
+  body {
+    display: flex; flex-direction: column;   /* not grid rows: the hidden banner would shift them */
+    background: var(--color-bg);
+    color: var(--color-text);
+    font-family: var(--font-ui);
+    font-size: var(--text-md);
+    line-height: var(--line-body);
+  }
+  code { font-family: var(--font-mono); font-size: var(--text-sm); color: var(--color-text-muted); }
+
+  /* ---- header ----------------------------------------------------------- */
+  .bar {
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-md);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-surface);
+    border-bottom: var(--border-w) solid var(--color-border);
+  }
+  .bar-brand { display: flex; align-items: center; gap: var(--space-sm); }
+  .bar-logo { display: block; width: 26px; height: 26px; flex: none; }
+  .bar-title { margin: 0; font-size: var(--text-lg); font-weight: 600; }
+  .bar-sub { color: var(--color-text-muted); font-weight: 400; }
+  .bar-ctl { display: flex; align-items: center; gap: var(--space-md); margin-left: auto; }
+  .bar-ctl-label b { font-weight: 600; }
+
+  .btn {
+    font: inherit; color: var(--color-text);
+    background: var(--color-surface-raised);
+    border: var(--border-w) solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--space-xs) var(--space-md);
+    cursor: pointer;
+  }
+  .btn:hover { border-color: var(--color-accent); }
+  .btn:focus-visible { outline: var(--tally-w) solid var(--color-accent); outline-offset: var(--border-w); }
+
+  /* ---- chips: text is the message, the dot is only a second cue --------- */
+  .chip {
+    display: inline-flex; align-items: center; gap: var(--space-sm);
+    padding: 0 var(--space-sm);
+    border: var(--border-w) solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--text-sm); color: var(--color-text);
+    white-space: nowrap;
+  }
+  .chip-dot {
+    inline-size: var(--space-sm); block-size: var(--space-sm);
+    border-radius: 50%;
+    background: var(--color-text-muted);
+    border: var(--border-w) solid var(--color-text-muted);
+  }
+  /* filled = settled, hollow = still trying */
+  #host[data-state="ready"] .chip-dot,
+  #input[data-state="ready"] .chip-dot,
+  .tile[data-state="live"] .tile-chip .chip-dot { background: var(--color-ok); border-color: var(--color-ok); }
+  #input[data-state="connecting"] .chip-dot,
+  .tile[data-state="connecting"] .tile-chip .chip-dot,
+  .tile[data-state="starting"] .tile-chip .chip-dot { background: transparent; border-color: var(--color-warn); }
+  #host[data-state="offline"] .chip-dot,
+  #input[data-state="offline"] .chip-dot,
+  .tile[data-state="lost"] .tile-chip .chip-dot,
+  .tile[data-state="degraded"] .tile-chip .chip-dot { background: var(--color-warn); border-color: var(--color-warn); }
+  .tile[data-state="nosignal"] .tile-chip .chip-dot,
+  .tile[data-state="idle"] .tile-chip .chip-dot { background: transparent; }
+  .tile[data-state="degraded"] .tile-chip,
+  #host[data-state="offline"],
+  #input[data-state="offline"] { border-color: var(--color-warn); }
+
+  /* ---- banner + empty state -------------------------------------------- */
+  .banner {
+    margin: 0;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-surface-raised);
+    border-bottom: var(--border-w) solid var(--color-warn);
+    border-left: var(--tally-w) solid var(--color-warn);
+  }
+
+  /* login notice: advice, not an error, so accent rather than warn unless open */
+  .notice {
+    display: flex; align-items: center; gap: var(--space-md);
+    margin: 0;
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-surface-raised);
+    border-bottom: var(--border-w) solid var(--color-border);
+    border-left: var(--tally-w) solid var(--color-accent);
+  }
+  .notice[hidden] { display: none; }
+  .notice[data-mode="none"] { border-left-color: var(--color-warn); }
+  .notice-text { margin: 0; flex: 1; max-inline-size: 110ch; }
+  .foot-ver { color: var(--color-text-muted); font-family: var(--font-mono); font-size: var(--text-sm);
+              margin-inline-start: var(--space-md); }
+  .foot-ver:hover, .foot-ver:focus-visible { color: var(--color-accent); }
+
+  .stage { flex: 1; min-height: 0; overflow: auto; padding: var(--space-md); }
+
+  .empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: var(--space-sm); min-height: 100%; text-align: center;
+  }
+  .empty-title { margin: 0; font-size: var(--text-xl); }
+  .empty-text { margin: 0; color: var(--color-text-muted); max-inline-size: 60ch; }
+  .spinner {
+    inline-size: var(--space-xl); block-size: var(--space-xl);
+    border: var(--tally-w) solid var(--color-border);
+    border-top-color: var(--color-accent);
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(1turn); } }
+
+  /* ---- matrix ----------------------------------------------------------- */
+  .matrix {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(var(--tile-min), 100%), 1fr));
+    gap: var(--space-md);
+    align-content: start;
+  }
+  .tile {
+    position: relative;
+    display: flex; flex-direction: column;
+    background: var(--color-surface);
+    border: var(--border-w) solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+  }
+  .tile:hover { border-color: var(--color-accent); }
+
+  .tile-video { position: relative; aspect-ratio: 16 / 9; background: var(--color-video-bg); }
+  .tile-video video {
+    display: block; inline-size: 100%; block-size: 100%;
+    object-fit: contain; background: var(--color-video-bg);
+  }
+  .tile-msg {
+    position: absolute; inset: 0; margin: 0;
+    display: flex; align-items: center; justify-content: center;
+    padding: var(--space-lg); text-align: center;
+    color: var(--color-text-muted);
+    pointer-events: none;
+  }
+  .tile[data-state="live"] .tile-msg { display: none; }
+  .tile[data-state="degraded"] .tile-msg {
+    inset: 0 0 auto 0; padding: var(--space-xs) var(--space-sm);
+    justify-content: flex-start; text-align: start;
+    background: var(--color-scrim); color: var(--color-text);
+    font-size: var(--text-sm);
+    border-bottom: var(--border-w) solid var(--color-warn);
+  }
+
+  /* under-monitor display: source name, address, state */
+  .tile-umd {
+    /* above the whole-tile click layer, so its chips get hover and focus */
+    position: relative; z-index: 1;
+    display: flex; align-items: center; gap: var(--space-sm);
+    padding: var(--space-xs) var(--space-sm);
+    background: var(--color-surface-raised);
+    border-top: var(--border-w) solid var(--color-border);
+  }
+  .tile-name { font-weight: 600; }
+  .tile-chip { margin-left: auto; }
+  .tile-info:not([hidden]) ~ .tile-chip, .tile-errors:not([hidden]) ~ .tile-chip { margin-left: var(--space-sm); }
+  /* unit-info chip (firmware/CPU/uptime); neutral, detail in its tooltip */
+  .tile-info { margin-left: auto; cursor: help; }
+  .tile-info + .tile-errors, .tile-info:not([hidden]) ~ .tile-chip { margin-left: var(--space-sm); }
+  .tile-info:not([hidden]) + .tile-errors[hidden] + .tile-chip { margin-left: var(--space-sm); }
+  .tile-info:focus-visible, .tile-errors:focus-visible { outline: var(--tally-w) solid var(--color-accent); outline-offset: var(--border-w); }
+
+  /* broken-frame counter sits just before the state chip; warn = needs a look */
+  .tile-errors { border-color: var(--color-warn); cursor: help; }
+  .tile-errors .chip-dot { background: var(--color-warn); border-color: var(--color-warn); }
+  .tile-errors:not([hidden]) + .tile-chip { margin-left: 0; }
+
+  /* the whole tile is the select button */
+  .tile-select {
+    position: absolute; inset: 0;
+    background: transparent; border: 0; padding: 0;
+    cursor: pointer;
+  }
+  .tile-select:focus-visible {
+    outline: var(--tally-w) solid var(--color-accent);
+    outline-offset: calc(var(--tally-w) * -1);
+  }
+
+  .tile-grab { display: none; }
+
+  /* idle: no video pulled until the viewer asks. The view button replaces the
+     whole-tile select overlay so a reload never auto-connects. */
+  .tile-view {
+    position: absolute; inset: 0;
+    display: none;
+    flex-direction: column; align-items: center; justify-content: center;
+    gap: var(--space-xs);
+    font: inherit; color: var(--color-text);
+    background: var(--color-video-bg);
+    border: 0; padding: var(--space-lg);
+    cursor: pointer; text-align: center;
+  }
+  .tile[data-state="idle"] .tile-view { display: flex; }
+  .tile[data-state="idle"] .tile-select { display: none; }
+  .tile-view-main {
+    font-size: var(--text-lg);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-surface-raised);
+    border: var(--border-w) solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+  .tile-view-sub { color: var(--color-text-muted); font-size: var(--text-sm); max-inline-size: 36ch; }
+  .tile-view:hover .tile-view-main,
+  .tile-view:focus-visible .tile-view-main { border-color: var(--color-accent); }
+  .tile-view:focus-visible { outline: none; }
+
+  /* ---- channel bus: one button per transmitter, lit = the one you control -- */
+  .bus { display: flex; align-items: center; gap: var(--space-sm); }
+  .bus-label { color: var(--color-text-muted); font-size: var(--text-sm); }
+  .bus-btns { display: flex; flex-wrap: wrap; gap: var(--space-xs); }
+  .bus-btn {
+    font: inherit; font-family: var(--font-mono); color: var(--color-text);
+    min-inline-size: var(--space-xl); min-block-size: var(--space-xl);
+    padding: 0 var(--space-sm);
+    background: var(--color-surface-raised);
+    border: var(--border-w) solid var(--color-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+  }
+  .bus-btn:hover { border-color: var(--color-accent); }
+  .bus-btn:focus-visible { outline: var(--tally-w) solid var(--color-accent); outline-offset: var(--border-w); }
+  /* no video: dashed outline and muted number; still selectable */
+  .bus-btn[data-state="nosignal"] { color: var(--color-text-muted); border-style: dashed; }
+  /* the controlled channel: tally border plus an underline, so it is not colour alone */
+  .bus-btn[aria-pressed="true"] {
+    border: var(--tally-w) solid var(--color-tally);
+    text-decoration: underline; text-underline-offset: var(--space-xs);
+    font-weight: 600;
+  }
+  .chip-hot { border-color: var(--color-accent); }
+  .chip-hot .chip-dot { background: var(--color-accent); border-color: var(--color-accent); }
+
+  /* no signal + transmitter present: offer the wake tap */
+  .tile-wake {
+    position: absolute; inset: auto 0 0 0; z-index: 1;
+    display: flex; flex-direction: column; align-items: center; gap: var(--space-xs);
+    font: inherit; color: var(--color-text);
+    background: transparent; border: 0;
+    padding: var(--space-md) var(--space-lg) var(--space-lg);
+    cursor: pointer; text-align: center;
+  }
+  .tile-wake-main {
+    font-size: var(--text-lg);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-surface-raised);
+    border: var(--border-w) solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+  .tile-wake-sub { color: var(--color-text-muted); font-size: var(--text-sm); max-inline-size: 48ch; }
+  .tile-wake:hover .tile-wake-main,
+  .tile-wake:focus-visible .tile-wake-main { border-color: var(--color-accent); }
+  .tile-wake:focus-visible { outline: none; }
+  .tile[data-state="nosignal"] .tile-msg { align-items: flex-start; padding-top: var(--space-2xl); }
+
+
+  /* ---- control view ----------------------------------------------------- */
+  .is-control .stage { overflow: hidden; }
+  .is-control .empty { display: none; }
+  .is-control .matrix { display: flex; block-size: 100%; }
+  .is-control .tile:not(.is-selected) { display: none; }
+  .is-control .tile.is-selected {
+    flex: 1;
+    border: var(--tally-w) solid var(--color-tally);
+  }
+  .is-control .tile.is-selected .tile-video { flex: 1; min-height: 0; aspect-ratio: auto; }
+  .is-control .tile.is-selected .tile-select { display: none; }
+  .is-control .tile.is-selected .tile-grab {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: var(--space-xs);
+    font: inherit; color: var(--color-text);
+    background: var(--color-scrim);
+    border: 0; padding: var(--space-lg);
+    cursor: pointer; text-align: center;
+  }
+  .is-control .tile.is-selected[data-state="live"] .tile-grab,
+  .is-control .tile.is-selected[data-state="degraded"] .tile-grab { background: transparent; }
+  .tile-grab-main {
+    font-size: var(--text-xl);
+    padding: var(--space-sm) var(--space-md);
+    background: var(--color-surface-raised);
+    border: var(--border-w) solid var(--color-border);
+    border-radius: var(--radius-md);
+  }
+  .tile-grab-sub { color: var(--color-text-muted); }
+  .tile-grab:focus-visible .tile-grab-main,
+  .tile-grab:hover .tile-grab-main { border-color: var(--color-accent); }
+  .tile-grab:focus-visible { outline: none; }
+  /* status text sits clear of the centred hint, above it in stacking order */
+  .is-control .tile.is-selected .tile-msg { inset: auto 0 0 0; z-index: 1; }
+  .is-control .tile.is-selected[data-state="degraded"] .tile-msg { inset: 0 0 auto 0; }
+
+  .is-locked .tile.is-selected .tile-grab { display: none; }
+  .is-locked .tile.is-selected video { cursor: none; }
+
+  /* ---- footer ----------------------------------------------------------- */
+  .foot {
+    padding: var(--space-sm) var(--space-md);
+    border-top: var(--border-w) solid var(--color-border);
+    color: var(--color-text-muted);
+    font-size: var(--text-sm);
+  }
+}

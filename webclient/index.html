@@ -1,0 +1,661 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KVM multiviewer</title>
+<script>
+  // Relative URLs below need the page URL to end in "/" (behind a reverse proxy
+  // at /kvm, "/kvm" would resolve them against "/"). Add it if it is missing.
+  if (!location.pathname.endsWith("/") && !location.pathname.endsWith(".html"))
+    location.replace(location.pathname + "/" + location.search + location.hash);
+</script>
+<link rel="icon" href="static/logo.svg">
+<link rel="stylesheet" href="static/tokens.css">
+<link rel="stylesheet" href="static/app.css">
+</head>
+<body>
+<header class="bar">
+  <span class="bar-brand">
+    <img class="bar-logo" src="static/logo.svg" alt="" width="26" height="26">
+    <h1 class="bar-title">KVM <span class="bar-sub">multiviewer</span></h1>
+  </span>
+  <span class="chip" id="count" tabindex="0"
+        title="How transmitters are found: the gateway listens for each transmitter's video multicast (239.1.1.1, UDP 4400–4415 for IDs 1–16) and every 5 s also checks whether something answers at each transmitter address (192.168.167.10–25). A transmitter is listed as soon as either happens, and stays listed until the gateway restarts, with its state on the tile: video, no video (screen blanked, asleep, off or unplugged), or not answering (unpowered or disconnected). The hardware receiver (192.168.167.90) is not listed. While no page is open the gateway stops listening (IDLE_SECS) and finds everything again within about 5 s of the next visit.">
+    <span class="chip-dot" aria-hidden="true"></span><span class="chip-text">— transmitters</span></span>
+  <span class="chip" id="host" role="status" tabindex="0" hidden
+        title="Load on the machine that runs this multiviewer service"><span class="chip-dot" aria-hidden="true"></span><span class="chip-text"></span></span>
+  <span class="chip" id="input" data-state="connecting"
+        title="WebSocket that carries your keyboard and mouse to the gateway">
+    <span class="chip-dot" aria-hidden="true"></span><span class="chip-text">Input: connecting</span></span>
+  <nav class="bus" id="bus" aria-label="Channel" hidden>
+    <span class="bus-label" aria-hidden="true">Channel</span>
+    <span class="bus-btns" id="bus-btns"
+          title="Switch to a transmitter by its channel number. Keyboard: press Right Ctrl twice, then the number — the same hotkey as the hardware receiver. Example: Right Ctrl, Right Ctrl, 4."></span>
+    <button type="button" class="btn" id="viewall"
+            title="Show every transmitter and start the video of each one that is sending a picture. While controlling one, this also ends control: keyboard and mouse stop going to it.">View all</button>
+  </nav>
+  <span class="chip chip-hot" id="hot" role="status" hidden>
+    <span class="chip-dot" aria-hidden="true"></span><span class="chip-text"></span></span>
+  <span class="bar-ctl" id="ctl" hidden>
+    <span class="bar-ctl-label">Controlling <b id="ctl-name"></b> <code id="ctl-ip"></code></span>
+  </span>
+</header>
+
+<div class="banner" id="banner" role="alert" hidden></div>
+<div class="notice" id="auth-notice" role="status" hidden>
+  <p class="notice-text" id="auth-notice-text"></p>
+  <button type="button" class="btn" id="auth-notice-close">Got it</button>
+</div>
+
+<main class="stage" id="stage">
+  <section class="empty" id="empty" aria-live="polite">
+    <span class="spinner" aria-hidden="true"></span>
+    <p class="empty-title" id="empty-title">Asking the gateway for transmitters…</p>
+    <p class="empty-text">A transmitter appears here as soon as the gateway either receives its video
+      (multicast to 239.1.1.1, UDP 4400–4415) or gets an answer from its address (192.168.167.10–25, checked every 5 s).
+      A transmitter whose computer is asleep sends no video, so the address check is what finds it.
+      This page asks the gateway every 3 s.</p>
+    <p class="empty-text">Nothing after 10 s? The gateway's network port must be on the same network segment
+      (VLAN) as the extenders and receive their multicast; see the README, section "Network".</p>
+  </section>
+  <section class="matrix" id="matrix" aria-label="Transmitters"></section>
+</main>
+
+<footer class="foot">
+  Switch channel with the buttons above or Right Ctrl, Right Ctrl, then 1–16. This changes this page only;
+  the hardware receiver keeps its own channel.
+  <a class="foot-ver" id="version" href="https://github.com/luuvasara/avoip-multiviewer" target="_blank" rel="noopener"
+     title="Multiviewer version (vYYYY.MM.DD plus a letter per release that day). Opens the project repository: source, README, issues."></a>
+</footer>
+
+<template id="tile-tpl">
+  <article class="tile" data-state="connecting">
+    <div class="tile-video">
+      <video muted autoplay playsinline></video>
+      <p class="tile-msg"></p>
+      <button type="button" class="tile-view">
+        <span class="tile-view-main">Click to view</span>
+        <span class="tile-view-sub">This transmitter is sending video: its computer's screen is on. The
+          gateway decodes a feed only while someone views it (about 0.8 of a CPU core each), so it waits for
+          your click. A page reload stops it again.</span>
+      </button>
+      <button type="button" class="tile-wake" hidden>
+        <span class="tile-wake-main">Wake source</span>
+        <span class="tile-wake-sub">Sends one Shift tap to this transmitter's computer, which ends screen
+          blanking or wakes it from sleep without typing anything.</span>
+      </button>
+      <button type="button" class="tile-grab">
+        <span class="tile-grab-main">Click to control · Esc releases</span>
+        <span class="tile-grab-sub">While controlling, your keyboard and mouse go to this transmitter.</span>
+      </button>
+    </div>
+    <div class="tile-umd">
+      <span class="tile-name"></span>
+      <code class="tile-ip"></code>
+      <span class="chip tile-info" tabindex="0" hidden><span class="chip-dot" aria-hidden="true"></span><span class="chip-text"></span></span>
+      <span class="chip tile-errors" tabindex="0" hidden><span class="chip-dot" aria-hidden="true"></span><span class="chip-text"></span></span>
+      <span class="chip tile-chip"><span class="chip-dot" aria-hidden="true"></span><span class="chip-text"></span></span>
+    </div>
+    <button type="button" class="tile-select"></button>
+  </article>
+</template>
+
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const POLL_MS = 3000, RETRY_MS = 3000, ICE_CAP_MS = 2000;
+// Gateway URLs relative to this page, so a reverse-proxy prefix (/kvm/) just
+// works. Built from origin + path: a page opened as http://user:pass@host/
+// has the credentials in location.href, and fetch() refuses such URLs.
+const api = p => new URL(p, location.origin + location.pathname).href;
+
+// ---- USB HID usage tables (US layout) -------------------------------------
+const MOD = { ControlLeft:0x01, ShiftLeft:0x02, AltLeft:0x04, MetaLeft:0x08,
+              ControlRight:0x10, ShiftRight:0x20, AltRight:0x40, MetaRight:0x80 };
+const KEY = (() => { const m = {};
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZ".split("").forEach((c, i) => m["Key" + c] = 0x04 + i);
+  "123456789".split("").forEach((c, i) => m["Digit" + c] = 0x1e + i); m.Digit0 = 0x27;
+  Object.assign(m, { Enter:0x28, Escape:0x29, Backspace:0x2a, Tab:0x2b, Space:0x2c,
+    Minus:0x2d, Equal:0x2e, BracketLeft:0x2f, BracketRight:0x30, Backslash:0x31,
+    Semicolon:0x33, Quote:0x34, Backquote:0x35, Comma:0x36, Period:0x37, Slash:0x38,
+    CapsLock:0x39, PrintScreen:0x46, ScrollLock:0x47, Pause:0x48,
+    Insert:0x49, Home:0x4a, PageUp:0x4b, Delete:0x4c, End:0x4d, PageDown:0x4e,
+    ArrowRight:0x4f, ArrowLeft:0x50, ArrowDown:0x51, ArrowUp:0x52,
+    NumLock:0x53, NumpadDivide:0x54, NumpadMultiply:0x55, NumpadSubtract:0x56,
+    NumpadAdd:0x57, NumpadEnter:0x58, Numpad0:0x62, NumpadDecimal:0x63,
+    IntlBackslash:0x64, ContextMenu:0x65, NumpadEqual:0x67 });
+  for (let i = 1; i <= 9; i++) m["Numpad" + i] = 0x59 + (i - 1);
+  for (let i = 1; i <= 12; i++) m["F" + i] = 0x3a + (i - 1);
+  for (let i = 13; i <= 24; i++) m["F" + i] = 0x68 + (i - 13);
+  return m; })();
+
+// ---- tile state ------------------------------------------------------------
+// One honest state per tile; text is always shown, colour is only a second cue.
+const STATES = {
+  idle:       "Video ready",
+  connecting: "Connecting",
+  live:       "Live",
+  starting:   "Starting feed",
+  lost:       "Signal lost",
+  nosignal:   "No signal",
+  degraded:   "Degraded",
+};
+const tiles = new Map();          // id -> tile
+let selected = null;              // tile in control view
+let locked = false, unlockedAt = 0;
+
+function makeTile(f) {
+  const el = $("tile-tpl").content.firstElementChild.cloneNode(true);
+  const t = { id: f.id, tx: f.tx, whep: f.whep, el,
+    video: el.querySelector("video"), msg: el.querySelector(".tile-msg"),
+    chip: el.querySelector(".tile-chip"), chipText: el.querySelector(".tile-chip .chip-text"),
+    errs: el.querySelector(".tile-errors"), errsText: el.querySelector(".tile-errors .chip-text"),
+    info: el.querySelector(".tile-info"), infoText: el.querySelector(".tile-info .chip-text"),
+    btn: el.querySelector(".tile-select"), grab: el.querySelector(".tile-grab"),
+    view: el.querySelector(".tile-view"), wake: el.querySelector(".tile-wake"),
+    bus: document.createElement("button"), present: false,
+    pc: null, gen: 0, retry: 0, active: false, wanted: false, vstate: "idle", detail: "",
+    prevUnterm: null, degraded: 0, age: 0 };
+  el.querySelector(".tile-name").textContent = "TX " + f.id;
+  el.querySelector(".tile-ip").textContent = f.tx;
+  t.view.addEventListener("click", () => wantView(t));
+  t.btn.addEventListener("click", () => enterControl(t));
+  t.grab.addEventListener("click", () => t.video.requestPointerLock());
+  t.wake.addEventListener("click", () => {
+    send({ t: "wake", id: t.id });
+    t.woke = Date.now(); render(t);
+  });
+  // channel-bus button: same order as the tiles
+  t.bus.type = "button"; t.bus.className = "bus-btn"; t.bus.textContent = f.id;
+  t.bus.addEventListener("click", () => switchTo(t.id));
+  t.video.addEventListener("contextmenu", e => e.preventDefault());
+  // keep id order: insert before the first tile with a larger id
+  const after = [...tiles.values()].filter(o => o.id > t.id).sort((a, b) => a.id - b.id)[0];
+  $("matrix").insertBefore(el, after ? after.el : null);
+  $("bus-btns").insertBefore(t.bus, after ? after.bus : null);
+  $("bus").hidden = false;
+  tiles.set(t.id, t);
+  return t;
+}
+
+// Firmware / hardware / load detail read from the unit over its root telnet.
+function fmtUptime(sec) {
+  if (sec == null) return "?";
+  const d = Math.floor(sec / 86400), h = Math.floor(sec % 86400 / 3600), m = Math.floor(sec % 3600 / 60);
+  return d ? `${d}d ${h}h` : h ? `${h}h ${m}m` : `${m}m`;
+}
+// Build facts that can tell two hardware variants apart (names for the tooltip).
+const VERSION_FACTS = {
+  kernel_build: { name: "kernel build number" },
+  kernel_date:  { name: "kernel build date" },
+  app_md5:      { name: "app checksum" },
+  upd_md5:      { name: "update service (present only on the 12/2025 units so far)" },
+};
+// Per role: which of VERSION_FACTS differ between the units currently known.
+function versionDiffs(list) {
+  const byRole = {};
+  for (const f of list) if (f.info) (byRole[f.info.role] ||= []).push(f.info);
+  const out = {};
+  for (const [role, infos] of Object.entries(byRole))
+    out[role] = Object.keys(VERSION_FACTS).filter(k => new Set(infos.map(i => i[k] ?? null)).size > 1);
+  return out;
+}
+
+function renderInfo(t, info, diffs) {
+  if (!info) { t.info.hidden = true; return; }
+  t.info.hidden = false;
+  // Label = role + hardware variant letter. The gateway gives each distinct
+  // build fingerprint a letter (vA, vB, ...) in the order first seen.
+  t.infoText.textContent = `${info.role || "?"} · HW v${info.variant || "?"}` + (info.sticker ? ` · ${info.sticker}` : "");
+  const L = [];
+  L.push(`Hardware variant ${info.variant || "?"}: units with the same letter run an identical build ` +
+    `(kernel build ${info.kernel_build || "?"}, app ${info.app_md5 || "?"}, update service ${info.upd_md5 || "absent"})` +
+    (diffs && diffs.length ? `; differs from the other ${info.role} variants in: ${diffs.map(k => VERSION_FACTS[k].name).join(", ")}`
+                           : `; no other ${info.role} variant is connected`));
+  L.push(info.sticker
+    ? `Factory sticker date seen on this build: ${info.sticker}. Changeover: vA was seen on a 11/2024 unit, vB on 12/2025 units, ` +
+      `so the switch happened between 12/2024 and 12/2025 (exact month unknown). TESmart's own old/new split is June 2024; both variants are after it.`
+    : "Factory sticker date: not recorded for this build yet (the unit cannot report it; check the sticker)");
+  L.push(`Role: ${info.role === "TX" ? "transmitter (sends HDMI)" : info.role === "RX" ? "receiver (drives a display)" : "unknown"}`);
+  if (info.channel != null) L.push(info.role === "RX"
+      ? `Receiver is tuned to channel ${info.channel}`
+      : `Channel ID set on the unit: ${info.channel}` + (info.channel !== t.id ? ` (differs from the ID ${t.id} its address implies)` : ""));
+  if (info.app_md5) L.push(`Firmware: ${info.role === "RX" ? "player" : "encoder"} app checksum ${info.app_md5} — same checksum means the same build`);
+  L.push(info.upd_md5
+    ? `Factory update service: installed (checksum ${info.upd_md5}), open on TCP 9981` + (info.trans === false ? ", not running" : "")
+    : "Factory update service: not installed (as on the 11/2024 unit)");
+  if (info.kernel) L.push(`Kernel: Linux ${info.kernel} ${info.kernel_build || ""}${info.smp ? " SMP" : ""}, built ${info.kernel_date || "?"}`);
+  if (info.uptime_s != null) L.push(`Uptime: ${fmtUptime(info.uptime_s)}`);
+  if (info.cpu_pct != null) L.push(`CPU: ${info.cpu_pct}% used` +
+      (info.load ? `, load ${info.load[0].toFixed(1)} (its firmware busy-loops, so a high load is normal)` : ""));
+  if (info.mem_used_pct != null) L.push(`Memory: ${info.mem_used_pct}% of ${Math.round(info.mem_total_kb / 1024)} MB`);
+  L.push(info.age == null ? "Live values: not read yet (build facts are from the cache)"
+       : `Live values read ${Math.round(info.age)} s ago; build facts read ${typeof info.read_at === "number" ? new Date(info.read_at * 1000).toLocaleString() : "?"} (re-read after a reboot)`);
+  const text = L.join("\n");
+  t.info.title = text; t.info.setAttribute("aria-label", "Unit details. " + text);
+}
+
+// Broken-frame counter: total since the feed started, with what each kind means.
+function renderErrors(t, h) {
+  const n = h ? (h.unterminated || 0) + (h.dropped || 0) : 0;
+  t.errs.hidden = n === 0;
+  if (!n) return;
+  const fmt = v => Number(v).toLocaleString("en-US");
+  const sizes = Object.keys(h.cut_sizes || {});
+  const lines = [`${fmt(n)} broken frame${n === 1 ? "" : "s"} since this feed started:`];
+  if (h.unterminated) {
+    let why;
+    if (sizes.length === 1)
+      why = `always cut at the same size, so the transmitter itself stops at its frame-size limit ` +
+            `(busy screens such as top exceed it; the hardware receiver garbles too)`;
+    else
+      why = `cut at ${sizes.length} different sizes, which points at loss on the way rather than a fixed limit`;
+    lines.push(`• ${fmt(h.unterminated)} incomplete from the transmitter, last one cut off at ` +
+               `${fmt(h.last_cut_bytes)} bytes: ${why}.`);
+  }
+  if (h.dropped)
+    lines.push(`• ${fmt(h.dropped)} lost in transit (fragments missing on the network or in this host).`);
+  if (h.skipped)
+    lines.push(`• ${fmt(h.skipped)} frames skipped (including the wait for the first keyframe), ` +
+               `so the picture holds the last good image instead of garbling.`);
+  const text = lines.join("\n");
+  t.errsText.textContent = `${fmt(n)} broken`;
+  t.errs.title = text;
+  t.errs.setAttribute("aria-label", text);
+}
+
+function render(t) {
+  const st = t.vstate === "live" && t.degraded > 0 ? "degraded" : t.vstate;
+  let detail = t.detail;
+  if (st === "degraded")
+    detail = `Transmitter sent incomplete frames — picture may garble (+${t.degraded} since last check)`;
+  if (st === "nosignal") {
+    const since = t.age === null ? "since the gateway started" : `for ${Math.round(t.age)} s`;
+    detail = t.present
+      ? `Why "Wake source": no video ${since}. The transmitter answers on the network but sends no picture, because its computer has blanked its screen (idle screen saver or console blanking), is asleep or off, or HDMI is unplugged. A transmitter sends nothing at all while its input is dark.`
+      : `No video ${since}, and the transmitter does not answer on the network (unpowered or unplugged).`;
+    if (t.woke && Date.now() - t.woke < 15000)
+      detail = "Wake tap sent. Video returns within about 10 s if the screen was blanked or the computer was asleep.";
+  }
+  t.wake.hidden = !(st === "nosignal" && t.present);
+  t.bus.dataset.state = st;
+  t.bus.setAttribute("aria-pressed", selected === t ? "true" : "false");
+  t.bus.title = `Channel ${t.id} · ${t.tx} · ${STATES[st]}`;
+  t.bus.setAttribute("aria-label", `Channel ${t.id}, ${STATES[st]}`);
+  t.el.dataset.state = st;
+  t.chipText.textContent = STATES[st];
+  t.chip.title = detail || STATES[st];
+  t.msg.textContent = detail;
+  t.btn.setAttribute("aria-label",
+    `Control TX ${t.id}, ${t.tx}. ${STATES[st]}${detail ? ": " + detail : ""}`);
+  if (selected === t) $("ctl-name").textContent = `TX ${t.id} (${STATES[st]})`;
+}
+function setVideo(t, state, detail) { t.vstate = state; t.detail = detail || ""; render(t); }
+
+// Video never starts on its own: a reload leaves every tile idle until the
+// viewer clicks it (or "View all"). Keeps the page from pulling feeds unasked.
+function wantView(t) {
+  if (t.wanted) return;
+  t.wanted = true;
+  sendView();
+  if (t.active) connect(t);
+}
+
+// ---- video (WHEP) ----------------------------------------------------------
+function stopVideo(t) {
+  t.gen++; clearTimeout(t.retry);
+  if (t.pc) { t.pc.close(); t.pc = null; }
+  t.video.srcObject = null;
+}
+function scheduleRetry(t, gen) {
+  if (gen !== t.gen) return;
+  clearTimeout(t.retry);
+  t.retry = setTimeout(() => { if (gen === t.gen && t.active) connect(t); }, RETRY_MS);
+}
+function iceDone(pc) {
+  return new Promise(res => {
+    if (pc.iceGatheringState === "complete") return res();
+    const done = () => { clearTimeout(cap); res(); };
+    const cap = setTimeout(done, ICE_CAP_MS);
+    pc.addEventListener("icegatheringstatechange",
+      () => pc.iceGatheringState === "complete" && done());
+  });
+}
+async function connect(t) {
+  stopVideo(t);
+  const gen = t.gen, retryNote = " — retrying in 3 s";
+  setVideo(t, "connecting", "Negotiating video with the gateway");
+  const pc = new RTCPeerConnection(); t.pc = pc;
+  pc.addTransceiver("video", { direction: "recvonly" });
+  pc.addTransceiver("audio", { direction: "recvonly" });
+  pc.ontrack = e => {
+    // KVM: latency matters more than smoothness; LAN jitter is tiny.
+    try { e.receiver.jitterBufferTarget = 0; } catch (_) {}
+    if (t.video.srcObject !== e.streams[0]) t.video.srcObject = e.streams[0];
+    t.video.play().catch(() => {});
+  };
+  pc.onconnectionstatechange = () => {
+    if (gen !== t.gen) return;
+    const s = pc.connectionState;
+    if (s === "connected") setVideo(t, "live", "");
+    else if (s === "failed" || s === "disconnected") {
+      setVideo(t, "lost", `Video connection ${s}${retryNote}`);
+      scheduleRetry(t, gen);
+    }
+  };
+  try {
+    await pc.setLocalDescription(await pc.createOffer());
+    await iceDone(pc);
+    if (gen !== t.gen) return;
+    let res;
+    try {
+      res = await fetch(api(t.whep), { method: "POST",
+        headers: { "Content-Type": "application/sdp" }, body: pc.localDescription.sdp });
+    } catch (e) {
+      if (gen !== t.gen) return;
+      setVideo(t, "starting", `Video server not reachable yet${retryNote}`);
+      return scheduleRetry(t, gen);
+    }
+    if (gen !== t.gen) return;
+    if (res.status === 404) {
+      setVideo(t, "starting", `Gateway is starting this feed${retryNote}`);
+      return scheduleRetry(t, gen);
+    }
+    if (!res.ok) {
+      setVideo(t, "lost", `Video server answered HTTP ${res.status}${retryNote}`);
+      return scheduleRetry(t, gen);
+    }
+    const sdp = await res.text();
+    if (gen !== t.gen) return;
+    await pc.setRemoteDescription({ type: "answer", sdp });
+  } catch (e) {
+    if (gen !== t.gen) return;
+    setVideo(t, "lost", `Video negotiation failed (${e.message})${retryNote}`);
+    scheduleRetry(t, gen);
+  }
+}
+
+// ---- /feeds poll -----------------------------------------------------------
+function showBanner(text) { const b = $("banner"); b.hidden = !text; b.textContent = text || ""; }
+
+function applyFeeds(list) {
+  list.sort((a, b) => a.id - b.id);
+  const diffs = versionDiffs(list);
+  for (const f of list) {
+    const t = tiles.get(f.id) || makeTile(f);
+    t.tx = f.tx; t.whep = f.whep; t.age = f.age; t.present = !!f.present;
+    renderInfo(t, f.info, f.info && diffs[f.info.role]);
+    renderErrors(t, f.health);
+    // degraded = the incomplete-frame counter grew since the previous poll
+    const u = f.health && typeof f.health.unterminated === "number" ? f.health.unterminated : null;
+    t.degraded = (u !== null && t.prevUnterm !== null && u > t.prevUnterm) ? u - t.prevUnterm : 0;
+    t.prevUnterm = u;
+    const was = t.active; t.active = !!f.active;
+    if (!t.active) { if (was || t.vstate !== "nosignal") { stopVideo(t); setVideo(t, "nosignal"); } else render(t); }
+    else if (!t.wanted) { if (t.vstate !== "idle") { stopVideo(t); setVideo(t, "idle"); } else render(t); }
+    else if (!was) connect(t);       // the user asked to view this one, and it is active
+    else render(t);
+  }
+  const n = tiles.size;
+  $("count").querySelector(".chip-text").textContent =
+    `${n} transmitter${n === 1 ? "" : "s"}`;
+  $("empty").hidden = n > 0;
+  $("empty-title").textContent = "Searching for transmitters…";
+}
+
+async function pollHost() {
+  try {
+    const r = await fetch(api("host"), { cache: "no-store", signal: AbortSignal.timeout(2500) });
+    if (r.ok) renderHost(await r.json());
+  } catch (_) {}
+  setTimeout(pollHost, 5000);
+}
+// Login notice: the built-in login is a fallback, the intended setup is an
+// authentication gateway in a reverse proxy (KVM_AUTH=proxy). Dismissal is
+// remembered per browser and per mode.
+function renderAuth(a) {
+  if (!a || a.mode === "proxy") return;
+  const key = "auth-notice-" + a.mode;
+  try { if (localStorage.getItem(key)) return; } catch (_) {}
+  const box = $("auth-notice");
+  if (!box.hidden) return;
+  $("auth-notice-text").textContent = a.mode === "none"
+    ? "No login: anyone who can reach this page can watch every screen and type into every connected computer. " +
+      "Put it behind a reverse proxy with an authentication gateway (for example Authelia, authentik or oauth2-proxy) " +
+      "and set KVM_AUTH=proxy. See the README, section \"Reverse proxy and login\"."
+    : "Signed in with the built-in password login, which is a fallback. For regular use put this page behind a " +
+      "reverse proxy with an authentication gateway (for example Authelia, authentik or oauth2-proxy) and set " +
+      "KVM_AUTH=proxy. See the README, section \"Reverse proxy and login\".";
+  box.dataset.mode = a.mode; box.hidden = false;
+  $("auth-notice-close").onclick = () => { box.hidden = true; try { localStorage.setItem(key, "1"); } catch (_) {} };
+}
+function renderHost(h) {
+  renderAuth(h.auth);
+  if (h.version) $("version").textContent = "v" + h.version;
+  const c = $("host"); c.hidden = false;
+  const load = h.load ? h.load[0].toFixed(2) : "?";
+  const cpu = h.cpu_pct != null ? `${h.cpu_pct}%` : "?";
+  c.querySelector(".chip-text").textContent = `${h.name}: ${cpu} CPU · load ${load}`;
+  const hot = h.load && h.ncpu && h.load[0] > h.ncpu;
+  c.dataset.state = hot ? "offline" : "ready";
+  const lines = [`${h.name} — the machine running this multiviewer`];
+  if (h.cpu_pct != null) lines.push(`CPU: ${h.cpu_pct}% busy`);
+  if (h.load) lines.push(`Load average: ${h.load.map(x => x.toFixed(2)).join(" / ")} (1/5/15 min) across ${h.ncpu} cores` +
+    (hot ? " — above core count, tasks are queueing" : ""));
+  if (h.mem_used_pct != null) lines.push(`Memory: ${h.mem_used_pct}% of ${(h.mem_total_mb / 1024).toFixed(1)} GB`);
+  c.title = lines.join("\n"); c.setAttribute("aria-label", lines.join(". "));
+}
+
+async function poll() {
+  try {
+    const r = await fetch(api(document.hidden ? "feeds?bg=1" : "feeds"), { cache: "no-store", signal: AbortSignal.timeout(2500) });
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const list = await r.json();
+    if (!Array.isArray(list)) throw new Error("unexpected reply");
+    showBanner("");
+    applyFeeds(list);
+  } catch (e) {
+    showBanner(`Can't read the transmitter list from the gateway (feeds: ${e.message}). ` +
+      `Retrying every 3 s; tiles keep their last known state.`);
+    if (!tiles.size) $("empty-title").textContent = "Waiting for the gateway…";
+  }
+  setTimeout(poll, POLL_MS);
+}
+
+// ---- input (WebSocket) -----------------------------------------------------
+let ws = null;
+function setInput(state, text) {
+  const c = $("input"); c.dataset.state = state;
+  c.querySelector(".chip-text").textContent = "Input: " + text;
+}
+function connectInput() {
+  // after a drop, keep saying "offline" while retrying instead of flickering to "connecting"
+  if ($("input").dataset.state !== "offline") setInput("connecting", "connecting");
+  let w;
+  // Same directory as the page, so it works under any reverse-proxy prefix.
+  const u = new URL(api("input")); u.protocol = u.protocol === "https:" ? "wss:" : "ws:";
+  try { w = new WebSocket(u); }
+  catch (e) { setInput("offline", "offline"); setTimeout(connectInput, 2000); return; }
+  ws = w;
+  w.onopen = () => { setInput("ready", "ready"); sendVis(); sendView(); if (selected) send({ t: "sel", id: selected.id }); };
+  w.onclose = () => {
+    if (ws !== w) return;
+    ws = null; setInput("offline", "offline"); setTimeout(connectInput, 2000);
+  };
+}
+const send = o => { if (ws && ws.readyState === 1) ws.send(JSON.stringify(o)); };
+
+// Tell the gateway whether this tab is visible. Only visible tabs count as
+// viewers, so a forgotten background tab lets the feeds stop (IDLE_SECS). After
+// HIDE_DETACH_MS hidden, the players are dropped too; they return when shown.
+const HIDE_DETACH_MS = 30000;
+let hideTimer = 0;
+// Tell the gateway which tiles this page shows video for; it converts only those.
+function sendView() { send({ t: "view", ids: [...tiles.values()].filter(t => t.wanted).map(t => t.id) }); }
+function sendVis() { send({ t: "vis", v: document.hidden ? "hidden" : "visible" }); }
+document.addEventListener("visibilitychange", () => {
+  sendVis();
+  clearTimeout(hideTimer);
+  if (document.hidden) {
+    hideTimer = setTimeout(() => {
+      for (const t of tiles.values()) if (t.pc) { stopVideo(t); setVideo(t, "lost", "Paused while this tab was in the background; reconnecting…"); }
+    }, HIDE_DETACH_MS);
+  } else {
+    for (const t of tiles.values()) if (t.wanted && t.active && !t.pc) connect(t);
+  }
+});
+
+const pressed = new Set();   // HID usages currently down (insertion order)
+let mods = 0, buttons = 0;
+const sendKeys = () => send({ t: "k", mods, keys: [...pressed].slice(0, 6) });
+function releaseAll() { pressed.clear(); mods = 0; buttons = 0; send({ t: "reset" }); }
+
+// ---- channel hotkey --------------------------------------------------------
+// Same grammar as the hardware receiver (manual 10.3): Right Ctrl twice within
+// 2 s, then within 3 s the channel: 1-9, or 1 followed by 0-6 for 10-16. A lone
+// "1" waits 1 s for that second digit. The Right Ctrl taps still reach the
+// controlled computer (harmless modifier taps); the digits do not.
+const HOT = { tapAt: 0, armed: false, digits: "", t1: 0, t2: 0, msg: 0 };
+function hotShow(text, ms) {
+  const c = $("hot"); clearTimeout(HOT.msg);
+  c.hidden = !text; c.querySelector(".chip-text").textContent = text || "";
+  if (text && ms) HOT.msg = setTimeout(() => hotShow(""), ms);
+}
+function hotDisarm() { HOT.armed = false; HOT.digits = ""; clearTimeout(HOT.t1); clearTimeout(HOT.t2); }
+function hotCommit(n) { hotDisarm(); hotShow(""); switchTo(n); }
+function hotkey(e) {              // keydown only; true = swallow the key
+  if (e.repeat) return HOT.armed;
+  if (HOT.armed) {
+    const m = /^(?:Digit|Numpad)(\d)$/.exec(e.code);
+    if (m) {
+      const d = +m[1];
+      if (HOT.digits === "") {
+        if (d === 1) {
+          HOT.digits = "1"; clearTimeout(HOT.t1);
+          hotShow("Channel 1… (0–6 for 10–16)");
+          HOT.t2 = setTimeout(() => hotCommit(1), 1000);
+        } else if (d >= 2) hotCommit(d);
+        else { hotDisarm(); hotShow("No channel 0 — channels are 1–16", 3000); }
+      } else if (d <= 6) hotCommit(10 + d);
+      else { hotDisarm(); hotShow(`No channel 1${d} — channels are 1–16`, 3000); }
+      return true;
+    }
+    if (e.code === "Escape") { hotDisarm(); hotShow(""); return true; }
+    if (e.code !== "ControlRight") { hotDisarm(); hotShow(""); }
+    return false;
+  }
+  if (e.code !== "ControlRight") { HOT.tapAt = 0; return false; }
+  const now = performance.now();
+  if (HOT.tapAt && now - HOT.tapAt < 2000) {
+    HOT.tapAt = 0; HOT.armed = true; HOT.digits = "";
+    hotShow("Channel: press 1–9, or 1 then 0–6");
+    HOT.t1 = setTimeout(() => { hotDisarm(); hotShow(""); }, 3000);
+  } else HOT.tapAt = now;
+  return false;
+}
+
+function onKey(down, e) {
+  if (down && hotkey(e)) { e.preventDefault(); return; }
+  if (!locked) {
+    if (down && e.key === "Escape" && selected && Date.now() - unlockedAt > 300) {
+      e.preventDefault(); leaveControl();
+    }
+    return;
+  }
+  e.preventDefault();
+  if (e.code in MOD) { mods = down ? (mods | MOD[e.code]) : (mods & ~MOD[e.code]); sendKeys(); return; }
+  const u = KEY[e.code]; if (u === undefined) return;
+  if (down) { if (pressed.has(u)) return; pressed.add(u); } else pressed.delete(u);
+  sendKeys();
+}
+function onMouseBtn(down, e) {
+  if (!locked) return; e.preventDefault();
+  const bit = e.button === 2 ? 2 : e.button === 1 ? 4 : 1;
+  buttons = down ? (buttons | bit) : (buttons & ~bit);
+  send({ t: "m", b: buttons, dx: 0, dy: 0, w: 0 });
+}
+function onMove(e) {
+  if (!locked) return;
+  // the gateway clamps each report to ±127, so split large moves instead of losing them
+  let dx = Math.round(e.movementX), dy = Math.round(e.movementY);
+  do {
+    const sx = Math.max(-127, Math.min(127, dx)), sy = Math.max(-127, Math.min(127, dy));
+    send({ t: "m", b: buttons, dx: sx, dy: sy, w: 0 });
+    dx -= sx; dy -= sy;
+  } while (dx || dy);
+}
+function onWheel(e) {
+  if (!locked) return; e.preventDefault();
+  const w = e.deltaY < 0 ? 1 : e.deltaY > 0 ? -1 : 0;
+  if (w) send({ t: "m", b: buttons, dx: 0, dy: 0, w });
+}
+addEventListener("keydown", e => onKey(true, e));
+addEventListener("keyup", e => onKey(false, e));
+document.addEventListener("mousedown", e => onMouseBtn(true, e));
+document.addEventListener("mouseup", e => onMouseBtn(false, e));
+document.addEventListener("mousemove", onMove);
+document.addEventListener("wheel", onWheel, { passive: false });
+addEventListener("blur", () => { if (locked) releaseAll(); });
+
+document.addEventListener("pointerlockchange", () => {
+  const was = locked;
+  locked = !!selected && document.pointerLockElement === selected.video;
+  document.body.classList.toggle("is-locked", locked);
+  if (was && !locked) { unlockedAt = Date.now(); releaseAll(); if (selected) selected.grab.focus(); }
+});
+
+// ---- matrix <-> control view -----------------------------------------------
+function enterControl(t) {
+  selected = t;
+  for (const o of tiles.values()) { o.video.muted = true; o.el.classList.toggle("is-selected", o === t); }
+  t.video.muted = false; t.video.play().catch(() => {});
+  document.body.classList.add("is-control");
+  $("ctl").hidden = false;
+  $("ctl-ip").textContent = t.tx;
+  for (const o of tiles.values()) render(o);
+  send({ t: "sel", id: t.id });
+  t.grab.focus();
+}
+// Channel switch from the bus or the hotkey: take control of that transmitter,
+// starting its video if it was not being viewed, and keep the mouse captured
+// if it was captured.
+function switchTo(id) {
+  const t = tiles.get(id);
+  if (!t) {
+    hotShow(`No transmitter on channel ${id} — it is not on the network`, 4000);
+    return;
+  }
+  if (selected === t) return;
+  const relock = locked;
+  pressed.clear(); mods = 0; buttons = 0;   // the gateway releases the old one on "sel"
+  wantView(t);
+  enterControl(t);
+  if (relock) Promise.resolve(t.video.requestPointerLock()).catch(() => {});
+}
+function leaveControl() {
+  const t = selected; if (!t) return;
+  if (document.pointerLockElement) document.exitPointerLock();
+  releaseAll();
+  selected = null;
+  t.video.muted = true;
+  t.el.classList.remove("is-selected");
+  document.body.classList.remove("is-control");
+  $("ctl").hidden = true;
+  render(t);
+  t.btn.focus();
+}
+// One button for both views: in control it returns to the matrix, and in
+// either case every transmitter that sends a picture starts playing.
+$("viewall").addEventListener("click", () => {
+  if (selected) leaveControl();
+  for (const t of tiles.values()) if (t.active && !t.wanted) wantView(t);
+});
+
+// ---- boot ------------------------------------------------------------------
+connectInput();
+poll();
+pollHost();
+</script>
+</body>
+</html>

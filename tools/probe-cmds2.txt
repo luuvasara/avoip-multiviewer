@@ -1,0 +1,10 @@
+echo "== CUSTOMER =="; ls -la /customer; echo ---A---
+echo "== INI FILES =="; for f in /customer/*.ini; do echo "## $f ##"; cat "$f"; echo; done; echo ---B---
+echo "== DEMO.SH =="; cat /customer/demo.sh 2>/dev/null; echo ---C---
+echo "== CONFIG DIR =="; ls -la /config 2>/dev/null; for f in /config/*; do echo "## $f ##"; cat "$f" 2>/dev/null; echo; done; echo ---D---
+echo "== VERSION HINTS =="; cat /customer/version* /customer/*.ver /config/version* 2>/dev/null; grep -rsiI 'version\|build\|2021\|2022\|2023' /customer/*.ini 2>/dev/null | head -20; echo ---E---
+echo "== IFCONFIG =="; ifconfig -a 2>/dev/null; echo ---F---
+echo "== TRANS CMDLINE =="; for p in $(pidof trans 2>/dev/null); do printf 'pid %s: ' $p; tr '\0' ' ' < /proc/$p/cmdline; echo; done; echo ---G---
+echo "== CONVERTOR CMDLINE =="; for p in $(pidof hdmi_convertor 2>/dev/null); do tr '\0' ' ' < /proc/$p/cmdline; echo; done; echo ---H---
+echo "== RTSPCLIENT CMDLINE =="; for p in $(pidof rtspclient 2>/dev/null); do tr '\0' ' ' < /proc/$p/cmdline; echo; done; echo ---I---
+echo "== CUSTOMER TEXT FILES =="; find /customer -type f \( -name '*.ini' -o -name '*.conf' -o -name '*.sh' -o -name '*.txt' -o -name 'version*' \) 2>/dev/null; echo ---J---

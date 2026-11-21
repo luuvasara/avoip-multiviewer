@@ -1,0 +1,4 @@
+echo "== LISTEN =="; netstat -ltnup 2>&1 | grep -v proc; echo ---A---
+echo "== CFG =="; hexdump -C /customer/config_file; cat /customer/demo.sh | tail -25; cat /customer/hdmiplayer/run.sh /customer/hdmiplayer/run.eth0.dhcp.203.ip.sh; echo ---B---
+echo "== STR =="; strings /customer/hdmiplayer/rtspclient | grep -i -E 'config_file|hotkey|hot key|scroll|switch|chang|channel|chn id|ID ?[:=]|172\.19|192\.168|239\.|main_stream|key ?(down|up|code)|hid|/dev/|ir_|IR |gpio|button|led|tm16|display' | head -90; echo ---C---
+echo "== PS =="; ps | grep -v '\]$'; ls /dev/input /dev/hidraw* 2>/dev/null; echo ---D---
