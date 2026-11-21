@@ -134,7 +134,8 @@ class Access:
         if self.mode != "proxy":
             out.append("NOTE: the built-in login is a fallback. For real use put this behind a "
                        "reverse proxy with an authentication gateway (Authelia, authentik, "
-                       "oauth2-proxy, ...) and set KVM_AUTH=proxy; see README, 'Reverse proxy and login'.")
+                       "oauth2-proxy, ...) and set KVM_AUTH=proxy: "
+                       "https://github.com/luuvasara/avoip-multiviewer#reverse-proxy-and-login")
         return out
 
     # -- proxy trust ----------------------------------------------------------

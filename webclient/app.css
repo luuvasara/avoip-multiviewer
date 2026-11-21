@@ -92,6 +92,7 @@
   .notice[hidden] { display: none; }
   .notice[data-mode="none"] { border-left-color: var(--color-warn); }
   .notice-text { margin: 0; flex: 1; max-inline-size: 110ch; }
+  .notice-text a, .empty-text a { color: var(--color-accent); }
   .foot-ver { color: var(--color-text-muted); font-family: var(--font-mono); font-size: var(--text-sm);
               margin-inline-start: var(--space-md); }
   .foot-ver:hover, .foot-ver:focus-visible { color: var(--color-accent); }
@@ -155,24 +156,27 @@
   .tile-umd {
     /* above the whole-tile click layer, so its chips get hover and focus */
     position: relative; z-index: 1;
-    display: flex; align-items: center; gap: var(--space-sm);
+    display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-xs) var(--space-sm);
     padding: var(--space-xs) var(--space-sm);
     background: var(--color-surface-raised);
     border-top: var(--border-w) solid var(--color-border);
   }
   .tile-name { font-weight: 600; }
-  .tile-chip { margin-left: auto; }
-  .tile-info:not([hidden]) ~ .tile-chip, .tile-errors:not([hidden]) ~ .tile-chip { margin-left: var(--space-sm); }
+  .tile-ip { margin-right: auto; }            /* chips sit at the right edge */
   /* unit-info chip (firmware/CPU/uptime); neutral, detail in its tooltip */
-  .tile-info { margin-left: auto; cursor: help; }
-  .tile-info + .tile-errors, .tile-info:not([hidden]) ~ .tile-chip { margin-left: var(--space-sm); }
-  .tile-info:not([hidden]) + .tile-errors[hidden] + .tile-chip { margin-left: var(--space-sm); }
-  .tile-info:focus-visible, .tile-errors:focus-visible { outline: var(--tally-w) solid var(--color-accent); outline-offset: var(--border-w); }
+  .tile-info { cursor: help; }
+  .tile-info:focus-visible, .tile-errors:focus-visible,
+  .tile-telnet:focus-visible { outline: var(--tally-w) solid var(--color-accent); outline-offset: var(--border-w); }
+  /* open root telnet on the unit: a standing security warning */
+  .tile-telnet { border-color: var(--color-warn); color: var(--color-warn); text-decoration: none; }
+  .tile-telnet[hidden] { display: none; }
+  .tile-telnet:hover { background: var(--color-surface); }
+  .tile-telnet .chip-dot { background: var(--color-warn); border-color: var(--color-warn); }
 
   /* broken-frame counter sits just before the state chip; warn = needs a look */
   .tile-errors { border-color: var(--color-warn); cursor: help; }
   .tile-errors .chip-dot { background: var(--color-warn); border-color: var(--color-warn); }
-  .tile-errors:not([hidden]) + .tile-chip { margin-left: 0; }
+
 
   /* the whole tile is the select button */
   .tile-select {
@@ -308,5 +312,52 @@
     border-top: var(--border-w) solid var(--color-border);
     color: var(--color-text-muted);
     font-size: var(--text-sm);
+  }
+
+  /* ---- copy text (OCR) and type text --------------------------------------- */
+  .bar-ctl .btn { white-space: nowrap; }
+  .ocr-layer {
+    position: absolute; inset: 0; z-index: 3;
+    cursor: crosshair; touch-action: none; user-select: none;   /* a drag draws, never selects text */
+    background: var(--color-scrim);
+  }
+  .ocr-layer[hidden] { display: none; }
+  .ocr-hint {
+    position: absolute; inset: var(--space-sm) var(--space-sm) auto var(--space-sm);
+    margin: 0; padding: var(--space-xs) var(--space-sm);
+    background: var(--color-surface-raised); border-radius: var(--radius-sm);
+    text-align: center; pointer-events: none;
+  }
+  .ocr-box {
+    position: absolute; display: none;
+    border: var(--tally-w) solid var(--color-accent);
+    background: transparent; pointer-events: none;
+  }
+  .is-ocr .tile.is-selected .tile-grab { display: none; }
+  .dlg {
+    inline-size: min(720px, calc(100vw - 2 * var(--space-md)));
+    padding: var(--space-md);
+    background: var(--color-surface); color: var(--color-text);
+    border: var(--border-w) solid var(--color-border); border-radius: var(--radius-md);
+  }
+  .dlg::backdrop { background: var(--color-scrim); }
+  .dlg h2 { margin: 0 0 var(--space-sm); font-size: var(--text-lg); }
+  .dlg p { margin: 0 0 var(--space-sm); color: var(--color-text-muted); }
+  .dlg textarea {
+    display: block; inline-size: 100%; box-sizing: border-box; min-block-size: 12em;
+    margin: 0 0 var(--space-sm); padding: var(--space-sm);
+    background: var(--color-bg); color: var(--color-text);
+    border: var(--border-w) solid var(--color-border); border-radius: var(--radius-sm);
+    font-family: var(--font-mono); font-size: var(--text-md); line-height: var(--line-body);
+  }
+  .dlg textarea:focus-visible { outline: var(--tally-w) solid var(--color-accent); }
+  .dlg-status { min-block-size: 1.5em; }
+  .dlg-status[data-state="error"] { color: var(--color-warn); }
+  .dlg-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-sm); justify-content: flex-end; }
+  .dlg-speed { display: inline-flex; align-items: center; gap: var(--space-xs); margin-right: auto; color: var(--color-text-muted); }
+  .dlg-speed select {
+    background: var(--color-bg); color: var(--color-text);
+    border: var(--border-w) solid var(--color-border); border-radius: var(--radius-sm);
+    padding: var(--space-xs) var(--space-sm); font: inherit;
   }
 }

@@ -47,6 +47,11 @@ PROBE_EVERY = 5       # seconds between presence sweeps
 UNWANTED_GRACE = 30   # s a feed keeps running after its last viewer left or hid
 INFO_EVERY = 30      # seconds between telnet info reads per present unit
 WAKE_GAP = 2          # seconds between wake taps per transmitter
+TYPE_MAX = 20000      # characters per "type" request
+TYPE_GAP = float(os.environ.get("TYPE_GAP_MS", 20)) / 1000   # default pause after each key report
+OCR_LANG = os.environ.get("OCR_LANG", "eng")    # Tesseract language(s), ex. eng+fin
+OCR_MAX_BYTES = 4 * 1024 * 1024
+OCR_MAX_PIXELS = 25_000_000   # PNG width x height; the page sends at most ~10 MP
 
 
 def tx_ip(n):
@@ -525,9 +530,98 @@ async def feeds(request):
                     # null = no video seen since the gateway started
                     "age": round(time.monotonic() - m.last[n], 1) if n in m.last else None,
                     "info": m.info_for(n),
+                    # The unit let the gateway log in as root with no password
+                    # (how unit details are read): proof its telnet is open.
+                    "telnet_open": n in m.info or n in m.static,
                     "health": m.health(n) if m.running(n) else None,
                     "whep": f"whep/{n}"})     # relative: works under any proxy prefix
     return web.json_response(out)
+
+
+async def ocr(request):
+    """Recognise the text in one PNG (a region the viewer selected on a video
+    frame, cropped and enlarged in the browser) with Tesseract, run locally.
+    Nothing is recognised unless a viewer asks; images are not kept."""
+    acc = request.app["access"]
+    if not acc.origin_ok(request):         # only this page may spend the CPU
+        raise web.HTTPForbidden(text="cross-origin request refused")
+    if request.content_type != "image/png":
+        raise web.HTTPUnsupportedMediaType(text="send image/png")
+    slots = request.app["ocr_slots"]
+    if slots.locked():
+        raise web.HTTPTooManyRequests(text="text recognition is busy, try again in a moment")
+    body = await request.read()            # whole body; client_max_size caps it
+    if len(body) < 24 or not body.startswith(b"\x89PNG\r\n\x1a\n") or body[12:16] != b"IHDR":
+        raise web.HTTPBadRequest(text="not a PNG image")
+    w, h = int.from_bytes(body[16:20], "big"), int.from_bytes(body[20:24], "big")
+    if not w or not h or w * h > OCR_MAX_PIXELS:
+        raise web.HTTPBadRequest(text=f"image of {w}x{h} pixels is too large")
+    async with slots:
+        try:
+            p = await asyncio.create_subprocess_exec(
+                "tesseract", "stdin", "stdout", "-l", OCR_LANG, "--psm", "6",
+                stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+                # one thread per run: Tesseract's OpenMP threads slow it down on
+                # small images and would compete with the video conversions
+                env=dict(os.environ, OMP_THREAD_LIMIT="1"))
+        except FileNotFoundError:
+            raise web.HTTPNotImplemented(text="text recognition is not installed (tesseract)")
+        try:
+            out, err = await asyncio.wait_for(p.communicate(body), 30)
+        except asyncio.TimeoutError:
+            raise web.HTTPGatewayTimeout(text="text recognition took over 30 s")
+        finally:
+            if p.returncode is None:       # timeout, shutdown or cancelled request
+                p.kill()
+                await p.wait()
+    if p.returncode != 0:
+        msg = err.decode("utf-8", "replace").strip().splitlines()
+        print(f"ocr failed ({p.returncode}): {msg[-1] if msg else 'no message'}", flush=True)
+        raise web.HTTPInternalServerError(
+            text=f"text recognition failed: {msg[-1] if msg else 'exit ' + str(p.returncode)}")
+    text = out.decode("utf-8", "replace").replace("\f", "").rstrip()
+    return web.json_response({"text": text, "lang": OCR_LANG})
+
+
+SKIP_NAMES = {"\x1b": "Esc", "\b": "Backspace"}   # readable names for skipped control keys
+
+
+async def type_text(ws, h, text, gap=TYPE_GAP):
+    """Type text on the transmitter as key taps (US layout), reporting progress
+    to the page. Cancelled by "type-stop", live keys, a channel switch or the
+    page leaving. A send error ends it as "error", never as "done"."""
+    taps, skipped = hid.plan(text[:TYPE_MAX])
+    total, done, state = len(taps), 0, "done"
+    try:
+        for shift, usage in taps:
+            mods = hid.MODS["shift"] if shift else 0
+            h.keyboard(mods, (usage,))
+            await asyncio.sleep(gap)
+            h.keyboard()
+            await asyncio.sleep(gap)
+            done += 1
+            if done % 20 == 0 and not ws.closed:
+                await ws.send_json({"t": "typed", "state": "running", "done": done, "total": total})
+    except asyncio.CancelledError:
+        state = "stopped"
+        raise
+    except Exception as e:                  # ex. sendto failing, socket closing
+        state = "error"
+        print(f"typing stopped by an error after {done} of {total}: {e!r}", flush=True)
+    finally:
+        try:
+            h.keyboard()                    # never leave a key held
+        except OSError:
+            pass
+        if not ws.closed:
+            try:
+                await ws.send_json({"t": "typed", "state": state, "done": done, "total": total,
+                                    "skipped": " ".join(SKIP_NAMES.get(c, c) if c.isprintable() or c in SKIP_NAMES
+                                                        else f"U+{ord(c):04X}" for c in sorted(set(skipped)))[:200],
+                                    "truncated": len(text) > TYPE_MAX})
+            except Exception:
+                pass
 
 
 def hid_for(app, n):
@@ -562,8 +656,14 @@ async def ws_input(request):
         raise web.HTTPForbidden(text="cross-origin input refused")
     ws = web.WebSocketResponse(heartbeat=20)
     await ws.prepare(request)
-    app, sel = request.app, None
+    app, sel, typing = request.app, None, None
     m = app["m"]
+
+    def stop_typing():
+        nonlocal typing
+        if typing and not typing.done():
+            typing.cancel()
+        typing = None
     m.touch()
     m.visible.add(ws)         # pages that predate the "vis" message count as visible
     m.want[ws] = None         # ...and, until they send "view", want every feed
@@ -578,6 +678,7 @@ async def ws_input(request):
                 if t == "sel":
                     n = int(e["id"])
                     if n in IDS and n != sel:
+                        stop_typing()
                         release(app, sel)
                         sel = n
                 elif t == "wake":
@@ -612,6 +713,7 @@ async def ws_input(request):
                 elif sel is None:
                     continue
                 elif t == "k":
+                    stop_typing()             # live keys take over from typed text
                     hid_for(app, sel).keyboard(
                         int(e.get("mods", 0)) & 0xFF,
                         [int(x) & 0xFF for x in e.get("keys", [])][:6])
@@ -621,9 +723,28 @@ async def ws_input(request):
                         clamp8(e.get("dy", 0)), clamp8(e.get("w", 0)))
                 elif t == "reset":
                     release(app, sel)
-            except (ValueError, KeyError, TypeError):
+                elif t == "type":
+                    # Paste as keystrokes into the selected transmitter, one
+                    # typist per transmitter so two pages cannot interleave.
+                    stop_typing()
+                    busy = app["typing"].get(sel)
+                    if busy is not None and not busy.done():
+                        await ws.send_json({"t": "typed", "state": "busy", "done": 0, "total": 0})
+                        continue
+                    text = str(e.get("text", ""))
+                    print(f"typing {min(len(text), TYPE_MAX)} characters to tx {sel} for {who}", flush=True)
+                    # The page may ask for a slower pace (5-200 ms per report)
+                    # for computers that drop keys at the default.
+                    gap = e.get("gap_ms")
+                    gap = TYPE_GAP if gap is None else max(5, min(200, int(gap))) / 1000
+                    typing = asyncio.create_task(type_text(ws, hid_for(app, sel), text, gap))
+                    app["typing"][sel] = typing
+                elif t == "type-stop":
+                    stop_typing()
+            except (ValueError, KeyError, TypeError, OverflowError):
                 continue
     finally:
+        stop_typing()
         m.visible.discard(ws)
         m.want.pop(ws, None)
         m.last_use = time.monotonic()
@@ -634,6 +755,7 @@ async def ws_input(request):
 
 async def on_start(app):
     app["http"] = aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=10))
+    app["ocr_slots"] = asyncio.Semaphore(2)     # each run is one Tesseract process
     m = app["m"]
     m.watch(asyncio.get_running_loop())
     app["sup"] = asyncio.create_task(m.supervise())
@@ -691,13 +813,15 @@ def main():
     access = Access(state_dir=a.state_dir)
     for line in access.startup_notice():
         print(line, flush=True)
-    app = web.Application(middlewares=[access.middleware(base)])
+    app = web.Application(middlewares=[access.middleware(base)],
+                          client_max_size=OCR_MAX_BYTES)   # largest body: an OCR image
     app["access"], app["args"], app["hids"], app["woke"] = access, a, {}, {}
+    app["typing"] = {}            # transmitter -> its typing task (one typist each)
     app["args"].webrtc_url = a.webrtc_url.rstrip("/")
     app["m"] = Matrix(a.iface, a.mtx, a.stale, a.status_dir, a.idle, a.state_dir)
     routes = [web.get(base + "/", index), web.get(base + "/healthz", healthz),
               web.get(base + "/feeds", feeds), web.get(base + "/host", host_stats_route),
-              web.get(base + "/input", ws_input),
+              web.get(base + "/input", ws_input), web.post(base + "/ocr", ocr),
               web.route("*", base + r"/whep/{n:\d+}", whep),
               web.route("*", base + r"/whep/{n:\d+}/{rest:[A-Za-z0-9_-]+}", whep),
               web.static(base + "/static", HERE, show_index=False)]

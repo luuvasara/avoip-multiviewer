@@ -5,9 +5,14 @@ A browser multiviewer and [KVM](https://en.wikipedia.org/wiki/KVM_switch) for th
 the extenders' network shows every transmitter on one page, and lets you take keyboard and
 mouse control of any of them from a browser. No hardware receiver is needed.
 
-![Matrix with three transmitters, all live](docs/screenshots/matrix-live.png)
+![Matrix with three transmitters: two live, one asleep with a Wake source button](docs/screenshots/matrix-live.png)
 
 *Screen contents are blurred in all screenshots because they show real server consoles.*
+
+> **Security warning: every HKE120-EH23 unit (transmitters and receiver) accepts telnet logins
+> as `root` with no password.** Anyone who can reach the extenders' network can take over a unit.
+> Keep the extenders on their own VLAN. See [Security](#security). The page marks each affected
+> transmitter with an **Open telnet** chip.
 
 Not affiliated with TESmart. The extender's protocol was worked out by observing our own units
 on our own network; see [docs/firmware-internals.md](docs/firmware-internals.md).
@@ -19,6 +24,9 @@ on our own network; see [docs/firmware-internals.md](docs/firmware-internals.md)
   delay. Each feed is converted only while someone is viewing it.
 - **Keyboard and mouse control** of the transmitter you select, sent the same way the hardware
   receiver sends it. The hardware receiver can stay on another channel.
+- **Copy text** from the screen: drag a box over the picture, the text is recognised on the
+  gateway and put on your clipboard, like PiKVM's OCR.
+- **Type text**: paste text and have it typed into the computer as keystrokes.
 - **Wake source**: one Shift tap to a transmitter whose computer has blanked its screen or is asleep.
 - **Unit details** per tile: role, hardware variant, firmware build, uptime, CPU and memory, read
   from the unit.
@@ -41,6 +49,7 @@ Each tile says why it looks the way it does. A tile is in one of these states:
 | Text, then picture | Connecting / Starting feed | The gateway is starting the conversion; the first picture takes a few seconds. | Wait. |
 | **Wake source** | No signal | The transmitter answers on the network but sends **no video at all**: its computer has blanked its screen (screen saver or console blanking), is asleep or off, or HDMI is unplugged. A transmitter with a dark input sends nothing, so there is no picture to show. | Click **Wake source** (one Shift tap). Video returns within about 10 s if the screen was only blanked or asleep. |
 | Message only | No signal | The transmitter does not answer on the network: no power or no cable. | Check the unit. |
+| **Open telnet** chip (orange) | any | The unit lets anyone log in as root without a password; **Open telnet + 9981** also has the open file-write service. Click the chip for details. | See [Security](#security). |
 | Picture with warning | Degraded | Frames arrived incomplete (lost on the network), so the picture may garble until the next keyframe. | See [Network](#network). |
 
 Before clicking (a fresh page shows every transmitter that sends video like this; the notice at
@@ -49,6 +58,7 @@ the top appears while the built-in login is in use):
 ![Tiles waiting for a click, with the login notice](docs/screenshots/matrix-click-to-view.png)
 
 Controlling one transmitter. Click the picture to capture keyboard and mouse; **Esc** releases them.
+**Copy text** and **Type text** sit next to the transmitter's name in the header.
 
 ![Control view of one transmitter](docs/screenshots/control-view.png)
 
@@ -58,6 +68,34 @@ transmitter and starts every feed that has a picture; while you control one, it 
 The same hotkey as the hardware receiver works on the page: **Right Ctrl, Right Ctrl, then 1–9**
 (or 1 then 0–6 for 10–16). It switches this page only; the hardware receiver keeps its own channel.
 The footer shows the version; it links to this repository.
+
+## Copy text and type text
+
+**Copy text** (OCR, [optical character recognition](https://en.wikipedia.org/wiki/Optical_character_recognition)):
+in control view, click **Copy text** and drag a box over the text. The browser cuts that box out
+of the current video frame, enlarges it, turns it dark-on-light, and sends it to the gateway, which
+reads it with [Tesseract](https://github.com/tesseract-ocr/tesseract) on the gateway itself (the idea
+comes from [PiKVM](https://github.com/pikvm/pikvm), see [Thanks](#thanks)); no
+cloud service sees it, and nothing is read until you ask. The text opens in a box where you can
+edit it, and is copied to your clipboard. Browsers allow automatic copying only on HTTPS pages (or
+localhost); on plain HTTP the text is selected for you to press Ctrl+C. The video is compressed,
+so check the result: look-alike characters (0 and O, 1 and l) can be mixed up. Other languages:
+add the Debian `tesseract-ocr-<lang>` package to the image and set `OCR_LANG` (ex. `eng+fin`).
+
+**Type text**: click **Type text**, paste the text, and click **Type it**. The gateway sends each
+character as a key press and release on a **US keyboard layout**, 25 characters per second by
+default (`TYPE_GAP_MS`, 20 ms per report); the dialog offers slower speeds for computers that drop
+fast keys. Line breaks press Enter, typographic quotes and dashes become plain ones, and
+characters without a US key (ex. `ä`, `€`) are skipped and listed afterwards. At most 20 000
+characters are typed per request. The computer must use a US layout, or symbols come out as that layout's keys. **Stop**,
+switching channel, pressing keys on the controlled computer yourself, or closing the page stops
+the typing. Only one page at a time can type into a transmitter.
+
+![Drawing a box over console text](docs/screenshots/copy-text-select.png)
+
+![The recognised text, copied (blurred here)](docs/screenshots/copy-text-result.png)
+
+![Type text dialog](docs/screenshots/type-text.png)
 
 ## How transmitters are found and shown
 
@@ -171,6 +209,8 @@ setting with an example.
 | `HID_IP` | `192.168.167.3` | Address added on `NIC` as the keyboard/mouse source; must be unused |
 | `LISTEN` | `0.0.0.0:8820` | Page address; `127.0.0.1:8820` when the proxy runs on the same host |
 | `HOST_NAME` | `gateway` | Name of this host in the page header |
+| `OCR_LANG` | `eng` | Tesseract language(s) for Copy text, ex. `eng+fin` (install the language pack) |
+| `TYPE_GAP_MS` | `20` | Pause after each key report when typing text; raise it if characters go missing |
 | `IDLE_SECS` | `120` | Stop everything after this long with no visible page; `0` = never |
 | `RENDER_DEVICE` | `/dev/dri/renderD128` | GPU used for encoding |
 | `LIBVA_DRIVER_NAME` | libva chooses | `i965` (Intel up to 9th gen) or `iHD` (newer) |
@@ -268,6 +308,87 @@ timings. Sending is not implemented: the network format of IR messages has not b
 and `rx/ir.py` explains how to capture it. See also
 [consumer IR](https://en.wikipedia.org/wiki/Consumer_IR).
 
+## Security
+
+- **Open root telnet on the units.** Every transmitter and the receiver answer telnet on TCP port
+  23 and log in `root` with no password (checked on all four units here, 2026-11-20). Anyone who
+  can reach the extenders' network can change a unit's ID and settings, replace its firmware, or
+  watch and inject video, keyboard and mouse traffic. There is no documented way to turn it off.
+  The gateway logs in this way, read-only, to show the unit details; a successful login is what
+  makes the page show the **Open telnet** chip on that transmitter.
+- **Open root file-write service on newer units.** Units with the factory update service
+  (`trans`, seen on the 12/2025 transmitters and on the receiver, shown as hardware variant **vB**)
+  also listen on TCP port 9981. Its code, read from the binary, takes a file name and data from
+  anyone who connects, kills processes of that name and writes the file as root. It was not
+  exercised here, because using it is a write to the unit. The **Open telnet** chip on a vB unit
+  says so.
+- **No authentication on the extender protocol.** Video is multicast in the clear, and a
+  transmitter accepts keyboard and mouse packets from any address, with no receiver paired.
+- **What to do:** put the extenders, their receivers and the gateway's extender port on a
+  dedicated VLAN with nothing else in it, route nothing into it, and reach the page only through
+  the reverse proxy with a login ([Reverse proxy and login](#reverse-proxy-and-login)).
+- **The page itself** gives full keyboard control of every connected computer. Login is on by
+  default; `KVM_AUTH=none` is meant only for an isolated network.
+
+## Compatible hardware and model names
+
+| Name | Status |
+|---|---|
+| **TESmart HKE120-EH23** "120M HDMI KVM Extender Many to Many 1080P60Hz over CAT5/6" | Tested: 3 transmitters (made 11/2024 and 12/2025) and 1 receiver |
+| **TESmart HKE12MMA20**, the same product's earlier name ([TESmart](https://support.tesmart.com/hc/en-us/articles/26641473432601-HKE120-EH23-Previously-Named-HKE12MMA20): "HKE120-EH23 (Previously Named HKE12MMA20)"); also printed as HKF12MMA20 in one manual | Same product; units made before June 2024 are the "old version", untested (see [Hardware versions](#hardware-versions)) |
+| **HKE120-EH23-USBK** (listed in the same manual) | Same manual; differences unknown, untested |
+| **TESmart HKE12MMA10**, the older model (apalrd.net, 2022) | Untested; probably the old version |
+| Maker named in the manuals: Tesla Elec Technology Co., Ltd ("Tesla Smart") | |
+| TESmart HKE10SS-E25 / HKE10SS-PD25 (4K, PoE) | **Not compatible**: point-to-point extenders without the 16-transmitter network |
+
+The project works with any unit that uses this protocol: transmitters at 192.168.167.10–25, video
+multicast to 239.1.1.1, keyboard hotkey Right Ctrl, Right Ctrl, then the channel number. No other
+brand selling the same hardware was found (searched 2026-11-21); similar AV-over-IP extenders from
+other makers (AV Access, Lenkeng, unbranded "many to many" kits) use their own protocols.
+
+Search terms this project answers: HDMI KVM extender over IP, KVM over IP extender, HDMI over IP
+extender many to many, HDMI over LAN / over Ethernet extender, AVoIP multiviewer, IP KVM web
+viewer, 1080P60 over CAT5e/CAT6 with 16 transmitters and 253 receivers.
+
+## Hardware versions
+
+**What TESmart says** (FAQ, updated 2024-12-16,
+https://support.tesmart.com/hc/en-us/articles/41230548979481-HKE120-EH23-FAQ):
+
+> "The new version of HKE120-EH23 supports IGMP authentication. It is possible to utilize more TXs
+> for many-to-many connections on IGMP network switches, and improves the video output stability
+> during many-to-many connections"
+
+> "the new version of RX cannot receive the video signal from the old version of TX, and the new
+> version of TX cannot send the video signal to the old version of RX"
+
+> "if the factory date is after June 2024, it is a new version; if it is before June 2024
+> (excluding June), it is an old version."
+
+The date is on the tear-proof sticker over a screw. TESmart upgrades old units for free by return.
+"IGMP authentication" most likely means the new units take part in
+[IGMP](https://en.wikipedia.org/wiki/Internet_Group_Management_Protocol), so switches with IGMP
+snooping forward their multicast; the old manual instead asks for IGMP (snooping) to be turned off.
+That reading is ours: TESmart does not explain the term.
+
+**What we measured** on four units (2026-11-20): all are "new version" by the sticker rule (11/2024
+and 12/2025). All run the same kernel build and the same encoder program, with the same IGMP setup
+(version 3; the receiver joins 239.1.1.1). The only difference is the factory update service
+(`trans`), present on the 12/2025 units and the receiver and missing on the 11/2024 unit. The page
+names these builds **HW vA** (11/2024, no update service) and **HW vB** (12/2025, with it): letters
+per distinct build, our own labels, not TESmart's. Details: [docs/firmware-internals.md](docs/firmware-internals.md).
+
+**What it means for this project:**
+- Tested only with new-version units. Old-version (before June 2024) transmitters are untested.
+  TESmart's incompatibility is about IGMP, which matters to a receiver joining the group; the
+  gateway joins with standard Linux IGMP and listens with snooping off, so an old transmitter may
+  work, but that is unverified.
+- With IGMP snooping on, the gateway's own IGMP joins should keep the video flowing to it, as for
+  a new-version receiver, provided the network has an IGMP querier. Also untested; we run with
+  snooping off.
+- vA and vB stream identically. vB adds the open file-write service (see [Security](#security)) and
+  spends 18–45 % of the unit's CPU on that service's busy loop, which has not shown up in the video.
+
 ## Command-line tools
 
 | Tool | What it does |
@@ -280,6 +401,7 @@ and `rx/ir.py` explains how to capture it. See also
 | `rx/ir.py` | IR code to raw timings (placeholder, sends nothing) |
 | `tools/framestats.py <ids>` | Frame sizes, cut frames, gaps and fps per transmitter, receive only |
 | `tools/latency.py` | Server-side delay from a screen change in to the same change out |
+| `tools/type-test.py` | Drives Type text on a test gateway and prints the progress (use an unused ID) |
 | `tools/access-test.sh` | Login and reverse-proxy checks against a throwaway gateway |
 | `tools/idle-test.py`, `tools/ondemand-test.py` | Idle and on-demand feed checks against a test gateway |
 
@@ -295,6 +417,16 @@ and `rx/ir.py` explains how to capture it. See also
 There is no pairing: a transmitter streams with no receiver present and accepts input from any
 address. Details, measurements and the firmware notes are in
 [docs/firmware-internals.md](docs/firmware-internals.md).
+
+## Thanks
+
+- [PiKVM](https://github.com/pikvm/pikvm) ([kvmd](https://github.com/pikvm/kvmd)) for the idea of
+  recognising screen text with Tesseract and copying it to the clipboard, and for "paste as keys",
+  including turning typographic quotes and dashes into plain ones. Our implementation is our own
+  code.
+- [apalrd](https://www.apalrd.net/) for the first public notes on this extender family's
+  keyboard/mouse packets.
+- [mediamtx](https://github.com/bluenviron/mediamtx) for the WebRTC server.
 
 ## Version
 

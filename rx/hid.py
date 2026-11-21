@@ -28,14 +28,38 @@ NAMED = {"enter": 0x28, "esc": 0x29, "backspace": 0x2A, "tab": 0x2B,
          **{f"f{n}": 0x39 + n for n in range(1, 13)}}
 BUTTONS = {"left": 1, "right": 2, "middle": 4}
 # US layout: character -> (usage, needs shift)
-_PLAIN = "\n\x1b\b\t -=[]\\#;'`,./"
+_PLAIN = "\n\x1b\b\t -=[]\\\0;'`,./"   # \0: 0x32 is the non-US # key, not "#"
 _SHIFT = "\0\0\0\0\0_+{}|~:\"~<>?"
 CHARS = {c: (0x04 + i, False) for i, c in enumerate("abcdefghijklmnopqrstuvwxyz")}
 CHARS.update({c.upper(): (u, True) for c, (u, _) in list(CHARS.items())})
 CHARS.update({c: (0x1E + i, False) for i, c in enumerate("1234567890")})
 CHARS.update({c: (0x1E + i, True) for i, c in enumerate("!@#$%^&*()")})
-CHARS.update({c: (0x28 + i, False) for i, c in enumerate(_PLAIN)})
+CHARS.update({c: (0x28 + i, False) for i, c in enumerate(_PLAIN) if c != "\0"})
 CHARS.update({c: (0x28 + i, True) for i, c in enumerate(_SHIFT) if c != "\0"})
+CHARS["~"] = (0x35, True)              # shift+` on US (0x32 is the non-US key)
+CHARS["\r"] = CHARS["\n"]            # Enter either way; "\r\n" is folded first
+
+
+# Typographic characters pasted from documents -> the ASCII a US keyboard has
+# (as PiKVM's kvmd/keyboard/printer.py does for quotes and dashes).
+TYPOGRAPHIC = str.maketrans({"\u201c": '"', "\u201d": '"', "\u201e": '"', "\u2018": "'",
+                             "\u2019": "'", "\u2013": "-", "\u2014": "--", "\u00a0": " ",
+                             "\u2026": "...", "\u2212": "-"})
+
+
+def plan(text):
+    """Text -> list of (shift, usage) taps for a US-layout host, plus the
+    characters that have no key there (non-ASCII, most control characters)."""
+    taps, skipped = [], []
+    text = text.replace("\r\n", "\n").translate(TYPOGRAPHIC)
+    for ch in text:
+        # Esc and Backspace inside pasted text would act on the target; skip them.
+        k = None if ch in "\x1b\b" else CHARS.get(ch)
+        if k is None:
+            skipped.append(ch)
+        else:
+            taps.append((k[1], k[0]))
+    return taps, skipped
 
 
 class Hid:

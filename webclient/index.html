@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KVM multiviewer</title>
+<meta name="description" content="Browser multiviewer and IP KVM for TESmart HKE120-EH23 (HKE12MMA20) HDMI KVM over IP extenders: every transmitter on one page, keyboard and mouse control, copy text from the screen.">
 <script>
   // Relative URLs below need the page URL to end in "/" (behind a reverse proxy
   // at /kvm, "/kvm" would resolve them against "/"). Add it if it is missing.
@@ -39,6 +40,10 @@
     <span class="chip-dot" aria-hidden="true"></span><span class="chip-text"></span></span>
   <span class="bar-ctl" id="ctl" hidden>
     <span class="bar-ctl-label">Controlling <b id="ctl-name"></b> <code id="ctl-ip"></code></span>
+    <button type="button" class="btn" id="ocr-btn"
+            title="Copy text from the screen: drag a box over the text, it is recognised on the gateway (Tesseract, no cloud) and put on your clipboard">Copy text</button>
+    <button type="button" class="btn" id="type-btn"
+            title="Type text into this computer as keystrokes, for example a long command or a password from your clipboard">Type text</button>
   </span>
 </header>
 
@@ -57,7 +62,8 @@
       A transmitter whose computer is asleep sends no video, so the address check is what finds it.
       This page asks the gateway every 3 s.</p>
     <p class="empty-text">Nothing after 10 s? The gateway's network port must be on the same network segment
-      (VLAN) as the extenders and receive their multicast; see the README, section "Network".</p>
+      (VLAN) as the extenders and receive their multicast:
+      <a href="https://github.com/luuvasara/avoip-multiviewer#network" target="_blank" rel="noopener">network requirements</a>.</p>
   </section>
   <section class="matrix" id="matrix" aria-label="Transmitters"></section>
 </main>
@@ -66,7 +72,7 @@
   Switch channel with the buttons above or Right Ctrl, Right Ctrl, then 1–16. This changes this page only;
   the hardware receiver keeps its own channel.
   <a class="foot-ver" id="version" href="https://github.com/luuvasara/avoip-multiviewer" target="_blank" rel="noopener"
-     title="Multiviewer version (vYYYY.MM.DD plus a letter per release that day). Opens the project repository: source, README, issues."></a>
+     title="Multiviewer version (vYYYY.MM.DD plus a letter per release that day). Opens the project page: setup guide, source and issue tracker."></a>
 </footer>
 
 <template id="tile-tpl">
@@ -85,6 +91,10 @@
         <span class="tile-wake-sub">Sends one Shift tap to this transmitter's computer, which ends screen
           blanking or wakes it from sleep without typing anything.</span>
       </button>
+      <div class="ocr-layer" hidden>
+        <p class="ocr-hint">Drag a box over the text to copy. Esc cancels.</p>
+        <div class="ocr-box"></div>
+      </div>
       <button type="button" class="tile-grab">
         <span class="tile-grab-main">Click to control · Esc releases</span>
         <span class="tile-grab-sub">While controlling, your keyboard and mouse go to this transmitter.</span>
@@ -93,18 +103,57 @@
     <div class="tile-umd">
       <span class="tile-name"></span>
       <code class="tile-ip"></code>
-      <span class="chip tile-info" tabindex="0" hidden><span class="chip-dot" aria-hidden="true"></span><span class="chip-text"></span></span>
-      <span class="chip tile-errors" tabindex="0" hidden><span class="chip-dot" aria-hidden="true"></span><span class="chip-text"></span></span>
+      <a class="chip tile-telnet" href="https://github.com/luuvasara/avoip-multiviewer#security" target="_blank" rel="noopener" hidden><span class="chip-dot" aria-hidden="true"></span><span class="chip-text">Open telnet</span></a>
+      <span class="chip tile-info" role="note" tabindex="0" hidden><span class="chip-dot" aria-hidden="true"></span><span class="chip-text"></span></span>
+      <span class="chip tile-errors" role="note" tabindex="0" hidden><span class="chip-dot" aria-hidden="true"></span><span class="chip-text"></span></span>
       <span class="chip tile-chip"><span class="chip-dot" aria-hidden="true"></span><span class="chip-text"></span></span>
     </div>
     <button type="button" class="tile-select"></button>
   </article>
 </template>
 
+<dialog class="dlg" id="ocr-dlg" aria-labelledby="ocr-title">
+  <h2 id="ocr-title">Copied text</h2>
+  <p class="dlg-status" id="ocr-status" role="status"></p>
+  <textarea id="ocr-text" spellcheck="false" aria-label="Recognised text"></textarea>
+  <p>Recognised by Tesseract on the gateway from the compressed video, so check it before use:
+    similar characters (0 and O, 1 and l) can be mixed up.</p>
+  <div class="dlg-actions">
+    <button type="button" class="btn" id="ocr-copy">Copy</button>
+    <button type="button" class="btn" id="ocr-close">Close</button>
+  </div>
+</dialog>
+
+<dialog class="dlg" id="type-dlg" aria-labelledby="type-title">
+  <h2 id="type-title">Type text into <span id="type-target"></span></h2>
+  <p>Each character is sent as a key press on a US keyboard layout. Line breaks press Enter.
+    Typographic quotes and dashes become plain ones; characters with no US key (for example ä or €)
+    are skipped and listed when done.
+    The computer must use a US layout for symbols to come out right.</p>
+  <textarea id="type-text" spellcheck="false" aria-label="Text to type"
+            placeholder="Paste or write the text to type"></textarea>
+  <p class="dlg-status" id="type-status" role="status"></p>
+  <p class="dlg-status" id="type-progress" aria-hidden="true"></p>
+  <div class="dlg-actions">
+    <label class="dlg-speed">Speed
+      <select id="type-speed" title="Slow it down if characters go missing on the computer (some BIOS screens and old systems drop fast keys)">
+        <option value="10">Fast, 50 per second</option>
+        <option value="20" selected>Normal, 25 per second</option>
+        <option value="50">Slow, 10 per second</option>
+        <option value="150">Very slow, 3 per second</option>
+      </select></label>
+    <button type="button" class="btn" id="type-go">Type it</button>
+    <button type="button" class="btn" id="type-stop" disabled>Stop</button>
+    <button type="button" class="btn" id="type-close">Close</button>
+  </div>
+</dialog>
+
 <script>
 "use strict";
 const $ = id => document.getElementById(id);
 const POLL_MS = 3000, RETRY_MS = 3000, ICE_CAP_MS = 2000;
+const PROJECT = "https://github.com/luuvasara/avoip-multiviewer";   // setup guide and source
+const guide = section => `${PROJECT}#${section}`;
 // Gateway URLs relative to this page, so a reverse-proxy prefix (/kvm/) just
 // works. Built from origin + path: a page opened as http://user:pass@host/
 // has the credentials in location.href, and fetch() refuses such URLs.
@@ -154,6 +203,7 @@ function makeTile(f) {
     info: el.querySelector(".tile-info"), infoText: el.querySelector(".tile-info .chip-text"),
     btn: el.querySelector(".tile-select"), grab: el.querySelector(".tile-grab"),
     view: el.querySelector(".tile-view"), wake: el.querySelector(".tile-wake"),
+    telnet: el.querySelector(".tile-telnet"), ocr: el.querySelector(".ocr-layer"),
     bus: document.createElement("button"), present: false,
     pc: null, gen: 0, retry: 0, active: false, wanted: false, vstate: "idle", detail: "",
     prevUnterm: null, degraded: 0, age: 0 };
@@ -234,6 +284,26 @@ function renderInfo(t, info, diffs) {
        : `Live values read ${Math.round(info.age)} s ago; build facts read ${typeof info.read_at === "number" ? new Date(info.read_at * 1000).toLocaleString() : "?"} (re-read after a reboot)`);
   const text = L.join("\n");
   t.info.title = text; t.info.setAttribute("aria-label", "Unit details. " + text);
+}
+
+// Security warning: the gateway reads unit details by logging in to the unit's
+// telnet as root with no password, so a successful read proves it is open.
+const TELNET_WARNING =
+  "Security: this unit accepts telnet logins (TCP port 23) as root with no password. " +
+  "The gateway proved it by logging in to read the unit details shown here (read-only). " +
+  "Anyone who can reach the extenders' network can take over the unit: change its ID or settings, " +
+  "replace its firmware, or watch and inject video, keyboard and mouse traffic. " +
+  "There is no documented way to turn it off, so keep the extenders on their own network (VLAN) " +
+  "that only this gateway and the receivers can reach. Click for details (opens the project page, section Security).";
+const TRANS_WARNING =
+  "\n\nAlso: this unit runs the factory update service (hardware variant vB), which listens on TCP port 9981 " +
+  "and writes any file it is sent as root, with no password. Not exercised here (that would be a write).";
+function renderTelnet(t, open, info) {
+  const text = TELNET_WARNING + (info && info.upd_md5 ? TRANS_WARNING : "");
+  t.telnet.hidden = !open;
+  t.telnet.querySelector(".chip-text").textContent = info && info.upd_md5 ? "Open telnet + 9981" : "Open telnet";
+  t.telnet.title = text;
+  t.telnet.setAttribute("aria-label", text);
 }
 
 // Broken-frame counter: total since the feed started, with what each kind means.
@@ -386,6 +456,7 @@ function applyFeeds(list) {
     const t = tiles.get(f.id) || makeTile(f);
     t.tx = f.tx; t.whep = f.whep; t.age = f.age; t.present = !!f.present;
     renderInfo(t, f.info, f.info && diffs[f.info.role]);
+    renderTelnet(t, f.telnet_open, f.info);
     renderErrors(t, f.health);
     // degraded = the incomplete-frame counter grew since the previous poll
     const u = f.health && typeof f.health.unterminated === "number" ? f.health.unterminated : null;
@@ -420,13 +491,16 @@ function renderAuth(a) {
   try { if (localStorage.getItem(key)) return; } catch (_) {}
   const box = $("auth-notice");
   if (!box.hidden) return;
-  $("auth-notice-text").textContent = a.mode === "none"
+  const why = a.mode === "none"
     ? "No login: anyone who can reach this page can watch every screen and type into every connected computer. " +
       "Put it behind a reverse proxy with an authentication gateway (for example Authelia, authentik or oauth2-proxy) " +
-      "and set KVM_AUTH=proxy. See the README, section \"Reverse proxy and login\"."
+      "and set KVM_AUTH=proxy. "
     : "Signed in with the built-in password login, which is a fallback. For regular use put this page behind a " +
       "reverse proxy with an authentication gateway (for example Authelia, authentik or oauth2-proxy) and set " +
-      "KVM_AUTH=proxy. See the README, section \"Reverse proxy and login\".";
+      "KVM_AUTH=proxy. ";
+  const link = Object.assign(document.createElement("a"), { href: guide("reverse-proxy-and-login"),
+    target: "_blank", rel: "noopener", textContent: "How to set up a login" });
+  $("auth-notice-text").replaceChildren(why, link, ".");
   box.dataset.mode = a.mode; box.hidden = false;
   $("auth-notice-close").onclick = () => { box.hidden = true; try { localStorage.setItem(key, "1"); } catch (_) {} };
 }
@@ -479,8 +553,13 @@ function connectInput() {
   catch (e) { setInput("offline", "offline"); setTimeout(connectInput, 2000); return; }
   ws = w;
   w.onopen = () => { setInput("ready", "ready"); sendVis(); sendView(); if (selected) send({ t: "sel", id: selected.id }); };
+  w.onmessage = ev => {
+    let m; try { m = JSON.parse(ev.data); } catch (_) { return; }
+    if (m.t === "typed") typedProgress(m);
+  };
   w.onclose = () => {
     if (ws !== w) return;
+    if (TYPE.running) typedProgress({ state: "lost", done: TYPE.done, total: TYPE.total });
     ws = null; setInput("offline", "offline"); setTimeout(connectInput, 2000);
   };
 }
@@ -556,6 +635,9 @@ function hotkey(e) {              // keydown only; true = swallow the key
 }
 
 function onKey(down, e) {
+  // A dialog has the keyboard; selecting text to copy listens only for Esc.
+  if (document.querySelector("dialog[open]")) return;
+  if (OCR.on) { if (down && e.key === "Escape") { e.preventDefault(); ocrEnd(); } return; }
   if (down && hotkey(e)) { e.preventDefault(); return; }
   if (!locked) {
     if (down && e.key === "Escape" && selected && Date.now() - unlockedAt > 300) {
@@ -635,6 +717,7 @@ function switchTo(id) {
 }
 function leaveControl() {
   const t = selected; if (!t) return;
+  ocrEnd();
   if (document.pointerLockElement) document.exitPointerLock();
   releaseAll();
   selected = null;
@@ -651,6 +734,163 @@ $("viewall").addEventListener("click", () => {
   if (selected) leaveControl();
   for (const t of tiles.values()) if (t.active && !t.wanted) wantView(t);
 });
+
+// ---- copy text from the screen (OCR) ----------------------------------------
+// The browser already has the decoded frame: the selected box is copied from
+// the <video> into a canvas, enlarged and made dark-on-light (what Tesseract
+// reads best), and sent to the gateway, which runs Tesseract locally.
+const OCR = { on: false, drag: false, x0: 0, y0: 0, box: null, gen: 0, abort: null };
+function ocrStart() {
+  const t = selected;
+  if (!t) return;
+  if (!t.video.videoWidth) { hotShow("No picture to copy text from yet", 3000); return; }
+  if (document.pointerLockElement) document.exitPointerLock();
+  OCR.on = true; OCR.drag = false; document.body.classList.add("is-ocr");
+  t.ocr.hidden = false; OCR.box = t.ocr.querySelector(".ocr-box"); OCR.box.style.display = "none";
+}
+function ocrEnd() {
+  if (!OCR.on) return;
+  OCR.on = false; OCR.drag = false; document.body.classList.remove("is-ocr");
+  for (const t of tiles.values()) t.ocr.hidden = true;
+}
+// Element box -> source video pixels, allowing for the letterbox of object-fit: contain.
+function videoRect(v, x, y, w, h) {
+  const r = v.getBoundingClientRect(), vw = v.videoWidth, vh = v.videoHeight;
+  const k = Math.min(r.width / vw, r.height / vh);
+  const ox = (r.width - vw * k) / 2, oy = (r.height - vh * k) / 2;
+  const cl = (n, max) => Math.max(0, Math.min(max, n));
+  const sx = cl((x - ox) / k, vw), sy = cl((y - oy) / k, vh);          // both corners, clamped
+  const ex = cl((x + w - ox) / k, vw), ey = cl((y + h - oy) / k, vh);  // to the picture
+  return { sx, sy, sw: ex - sx, sh: ey - sy };
+}
+function ocrImage(v, rc) {
+  // 2x: measured best on 1080p console text (no gain at 3-4x, small words
+  // misread at 1x); large boxes stay at most 2400 px wide.
+  const scale = Math.max(1, Math.min(2, 2400 / rc.sw)), B = 10;   // B: margin Tesseract wants
+  const c = document.createElement("canvas");
+  c.width = Math.round(rc.sw * scale) + 2 * B; c.height = Math.round(rc.sh * scale) + 2 * B;
+  const g = c.getContext("2d", { willReadFrequently: true });
+  g.imageSmoothingQuality = "high";
+  g.drawImage(v, rc.sx, rc.sy, rc.sw, rc.sh, B, B, c.width - 2 * B, c.height - 2 * B);
+  // fill the margin with the box's own edge colour, so it reads as background
+  const edge = g.getImageData(B, B, 1, 1).data;
+  g.fillStyle = `rgb(${edge[0]},${edge[1]},${edge[2]})`;
+  g.fillRect(0, 0, c.width, B); g.fillRect(0, c.height - B, c.width, B);
+  g.fillRect(0, 0, B, c.height); g.fillRect(c.width - B, 0, B, c.height);
+  const img = g.getImageData(0, 0, c.width, c.height), d = img.data;
+  let sum = 0;
+  for (let i = 0; i < d.length; i += 4) { const y = 0.299 * d[i] + 0.587 * d[i + 1] + 0.114 * d[i + 2]; d[i] = y; sum += y; }
+  const invert = sum / (d.length / 4) < 128;                       // light text on dark: flip it
+  for (let i = 0; i < d.length; i += 4) { const y = invert ? 255 - d[i] : d[i]; d[i] = d[i + 1] = d[i + 2] = y; }
+  g.putImageData(img, 0, 0);
+  return new Promise(res => c.toBlob(res, "image/png"));
+}
+async function ocrRun(t, x, y, w, h) {
+  ocrEnd();
+  const dlg = $("ocr-dlg"), st = $("ocr-status"), ta = $("ocr-text");
+  const rc = videoRect(t.video, x, y, w, h);
+  if (rc.sw < 4 || rc.sh < 4) { hotShow("That box is outside the picture; draw it over the text", 4000); return; }
+  const gen = ++OCR.gen, ctl = new AbortController();
+  OCR.abort = ctl;
+  ta.value = ""; st.dataset.state = ""; st.textContent = "Recognising text…";
+  dlg.showModal();
+  try {
+    const blob = await ocrImage(t.video, rc);
+    const r = await fetch(api("ocr"), { method: "POST", headers: { "Content-Type": "image/png" }, body: blob,
+                                        signal: AbortSignal.any([ctl.signal, AbortSignal.timeout(40000)]) });
+    if (!r.ok) throw new Error((await r.text()) || "HTTP " + r.status);
+    const text = (await r.json()).text;
+    if (gen !== OCR.gen || !dlg.open) return;          // closed or superseded meanwhile
+    ta.value = text;
+    if (!text.trim()) { st.textContent = "No text found in that box. Try a box with more margin around the text."; return; }
+    ta.focus(); ta.select();
+    await ocrCopy(true);
+  } catch (e) {
+    if (gen !== OCR.gen || e.name === "AbortError" && ctl.signal.aborted) return;
+    st.dataset.state = "error"; st.textContent = `Could not recognise text: ${e.message}`;
+  }
+}
+async function ocrCopy(auto) {
+  const st = $("ocr-status"), ta = $("ocr-text");
+  // The clipboard API works only on HTTPS pages (or localhost).
+  if (window.isSecureContext && navigator.clipboard) {
+    try { await navigator.clipboard.writeText(ta.value); st.textContent = "Copied to your clipboard. You can edit it here first and copy again."; return; }
+    catch (_) {}   // some browsers refuse after the wait for the result; Copy button works
+  }
+  ta.focus(); ta.select();
+  try { if (document.execCommand("copy")) { st.textContent = "Copied to your clipboard."; return; } } catch (_) {}
+  st.textContent = auto
+    ? (window.isSecureContext ? "Selected. Click Copy or press Ctrl+C." :
+       "Selected. Press Ctrl+C to copy (this browser copies automatically only on HTTPS pages).")
+    : "Press Ctrl+C to copy the selected text.";
+}
+for (const ev of ["pointerdown", "pointermove", "pointerup", "pointercancel"]) document.addEventListener(ev, e => {
+  if (!OCR.on || !selected || !selected.ocr.contains(e.target)) return;
+  if (e.type === "pointercancel") { OCR.drag = false; OCR.box.style.display = "none"; return; }
+  if (e.type === "pointerdown" && e.button !== 0) return;              // left button draws
+  if (e.type === "pointerdown") e.preventDefault();
+  const r = selected.ocr.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, b = OCR.box;
+  if (e.type === "pointerdown") { OCR.x0 = x; OCR.y0 = y; OCR.drag = true; selected.ocr.setPointerCapture(e.pointerId); }
+  if (!OCR.drag) return;
+  const L = Math.min(x, OCR.x0), T = Math.min(y, OCR.y0), W = Math.abs(x - OCR.x0), H = Math.abs(y - OCR.y0);
+  Object.assign(b.style, { display: "block", left: L + "px", top: T + "px", width: W + "px", height: H + "px" });
+  if (e.type === "pointerup") {
+    OCR.drag = false;
+    if (W < 8 || H < 8) { b.style.display = "none"; return; }     // a click, not a box
+    ocrRun(selected, L, T, W, H);
+  }
+});
+$("ocr-btn").addEventListener("click", ocrStart);
+$("ocr-copy").addEventListener("click", () => ocrCopy(false));
+$("ocr-close").addEventListener("click", () => $("ocr-dlg").close());
+$("ocr-dlg").addEventListener("close", () => {
+  OCR.gen++; if (OCR.abort) OCR.abort.abort();      // a late result must not land anywhere
+  if (selected) selected.grab.focus();
+});
+
+// ---- type text into the controlled computer ----------------------------------
+// The gateway sends the keystrokes (steady pace, keeps going if this tab is
+// busy); the page shows progress and can stop it.
+const TYPE = { running: false, done: 0, total: 0 };
+function typedProgress(m) {
+  // Progress goes to a silent line; only start and end are announced (role=status).
+  const st = $("type-status"), pr = $("type-progress");
+  TYPE.done = m.done; TYPE.total = m.total;
+  TYPE.running = m.state === "running";
+  $("type-go").disabled = TYPE.running; $("type-stop").disabled = !TYPE.running;
+  const n = `${m.done} of ${m.total} characters`;
+  if (m.state === "running") { pr.textContent = `Typed ${n}…`; return; }
+  pr.textContent = "";
+  st.dataset.state = ["lost", "error", "busy"].includes(m.state) ? "error" : "";
+  st.textContent =
+      m.state === "done" ? `Done: typed ${n}.` + (m.skipped ? ` Skipped (no US key): ${m.skipped}` : "") +
+                           (m.truncated ? " Only the first 20,000 characters were typed." : "")
+    : m.state === "stopped" ? `Stopped after ${n} (Stop, a channel switch, or keys typed on this computer).`
+    : m.state === "busy" ? "Another page is typing into this transmitter right now; try again when it is done."
+    : m.state === "error" ? `Stopped by an error after ${n}; see the gateway log.`
+    : `Connection to the gateway lost after ${n}; it may have stopped typing.`;
+}
+$("type-btn").addEventListener("click", () => {
+  if (!selected) return;
+  if (document.pointerLockElement) document.exitPointerLock();
+  $("type-target").textContent = `TX ${selected.id}`;
+  if (!TYPE.running) $("type-status").textContent = "";
+  $("type-dlg").showModal(); $("type-text").focus();
+});
+$("type-go").addEventListener("click", () => {
+  const text = $("type-text").value;
+  if (!text) { $("type-status").textContent = "Nothing to type."; return; }
+  if (!ws || ws.readyState !== 1) { $("type-status").dataset.state = "error"; $("type-status").textContent = "Not connected to the gateway (Input: offline)."; return; }
+  releaseAll();
+  const gap = +$("type-speed").value;
+  send({ t: "type", text, gap_ms: gap });
+  const secs = Math.ceil(text.length * gap * 2 / 1000);
+  $("type-status").textContent = `Typing… about ${secs < 90 ? secs + " s" : Math.round(secs / 60) + " min"} for ${text.length} characters`;
+  TYPE.running = true; $("type-go").disabled = true; $("type-stop").disabled = false;
+});
+$("type-stop").addEventListener("click", () => send({ t: "type-stop" }));
+$("type-close").addEventListener("click", () => $("type-dlg").close());
+$("type-dlg").addEventListener("close", () => { if (selected) selected.grab.focus(); });
 
 // ---- boot ------------------------------------------------------------------
 connectInput();

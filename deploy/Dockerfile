@@ -1,6 +1,7 @@
 # Web KVM multiviewer for TESmart HKE120-EH23 AV-over-IP extenders:
 # gateway + one feed pipeline per transmitter that is being viewed.
 # Debian's ffmpeg has software HEVC decode and h264_vaapi (Intel GPU encode).
+# Tesseract recognises text in screen regions for "Copy text" (OCR_LANG, default eng).
 # VAAPI drivers: i965 for Intel up to 9th gen (Haswell..Coffee Lake),
 # iHD (intel-media-va-driver) for Broadwell and newer; libva picks one itself
 # unless LIBVA_DRIVER_NAME says otherwise.
@@ -9,6 +10,7 @@ RUN apt-get update \
  && apt-get install -y --no-install-recommends \
       ffmpeg i965-va-driver intel-media-va-driver \
       python3 python3-aiohttp python3-jwt python3-cryptography \
+      tesseract-ocr tesseract-ocr-eng \
       iproute2 ethtool \
  && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
