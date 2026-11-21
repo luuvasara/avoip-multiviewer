@@ -343,6 +343,20 @@ and `rx/ir.py` explains how to capture it. See also
 | Maker named in the manuals: Tesla Elec Technology Co., Ltd ("Tesla Smart") | |
 | TESmart HKE10SS-E25 / HKE10SS-PD25 (4K, PoE) | **Not compatible**: point-to-point extenders without the 16-transmitter network |
 
+### Hardware inside (read from the units, 2026-11-20)
+
+| Part | Transmitter (TX) | Receiver (RX) |
+|---|---|---|
+| SoC | **SigmaStar SSC337** (SStar), single-core ARM Cortex-A7 (ARMv7), H.265/HEVC hardware encoder; the SSC337DE variant is likely from its ~44 MB of usable memory, not confirmed | SigmaStar, dual-core (SMP kernel); exact chip not identified |
+| HDMI input | **ITE IT6616** HDMI receiver (`it6616_MIPI.ko`, 4-lane MIPI CSI into the SoC) | HDMI output chip not identified |
+| Software | Linux 4.9.84, BusyBox 1.20.2, SigmaStar MI SDK pipeline VIF → VPE → VENC (H.265) plus I2S audio, encoder app `hdmi_convertor` (named after a SigmaStar SDK demo) | Linux 4.9.84 SMP, player app `rtspclient` |
+| Flash layout | `BOOT / KERNEL / rootfs / miservice / customer` (vendor app in the writable JFFS2 `customer` partition) | same |
+| Network | Fixed IP 192.168.167.(9 + ID), MAC `00:70:33:00:00:<ID>`, host name like `HKE12MMA20-TX`, telnet root without password | 192.168.167.90 |
+
+The same design (ITE IT6616 → MIPI CSI → SoC video encoder) appears in patent CN115396725A on a
+Rockchip RV1126; that is a design pattern, not evidence of who made these boards. Earlier HDMI-over-IP
+reverse-engineering work (Lenkeng LKV373, "HDMI extender hack") covers a different chip and protocol.
+
 The project works with any unit that uses this protocol: transmitters at 192.168.167.10–25, video
 multicast to 239.1.1.1, keyboard hotkey Right Ctrl, Right Ctrl, then the channel number. No other
 brand selling the same hardware was found (searched 2026-11-21); similar AV-over-IP extenders from
@@ -350,7 +364,9 @@ other makers (AV Access, Lenkeng, unbranded "many to many" kits) use their own p
 
 Search terms this project answers: HDMI KVM extender over IP, KVM over IP extender, HDMI over IP
 extender many to many, HDMI over LAN / over Ethernet extender, AVoIP multiviewer, IP KVM web
-viewer, 1080P60 over CAT5e/CAT6 with 16 transmitters and 253 receivers.
+viewer, 1080P60 over CAT5e/CAT6 with 16 transmitters and 253 receivers, SigmaStar SSC337 HDMI
+encoder, ITE IT6616 HDMI to MIPI, H.265 HEVC multicast 239.1.1.1 decoder, hdmi_convertor,
+TESmart extender telnet root, TESmart HKE120-EH23 reverse engineering, HKE12MMA20 protocol.
 
 ## Hardware versions
 
