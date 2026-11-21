@@ -482,12 +482,19 @@ version** (the suffixless unit is one TESmart confirmed needs the upgrade). So i
 
 ## Receiver with a "--" display (2026-11-21 18:00–18:08, read-only)
 
-One old receiver (no `trans`) shows "--" on its front display at all times. Its ID button works
-(owner: two presses move it from 01 to 03; `/customer/config_file` then reads `CH02`), its player
+One old receiver (no `trans`) shows "--" on its front display at all times. Its ID button worked
+once (owner: two presses moved it from 01 to 03; `/customer/config_file` then reads `CH02`), its player
 runs and joins 239.1.1.1, and with the old transmitter set to 03 it showed that picture on
-its monitor. So only the digit display is faulty. `rtspclient` holds `/dev/ttyS1` open, so the
+its monitor. So the video path is fine; the front panel is not (see below). `rtspclient` holds `/dev/ttyS1` open, so the
 display is probably on a front-panel controller reached over that UART (not probed: reading the
 port would steal the player's bytes).
+
+Button presses on this unit were unreliable afterwards: one pair moved it 01 → 03, the next pair
+did nothing, the pair after that made `rtspclient` exit in an orderly way (kernel log: decoder and
+HDMI clients disconnected) without saving a new channel and without anything restarting it, so the
+screen went dark until a power cycle, after which it came back on the stored channel (`CH02`,
+display 03). The player owns the panel (`/dev/ttyS1`), so display and button faults together
+point at the panel or its link. A healthy receiver's press has not been observed for comparison.
 
 What looked like faults but were not:
 - "Check Edid Data Fail": no HDMI cable yet; with a monitor it logged hot-plug and "EDID OK".
