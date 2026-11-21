@@ -480,14 +480,19 @@ version** (the suffixless unit is one TESmart confirmed needs the upgrade). So i
 "HKE12MMA20" = old, "HKE12MMA20-TX/-RX" = new; the sticker date rule mis-sorts the 24/11 unit. The page shows the label in the hardware-variant tooltip (`LABELS` in
 `webclient/gateway.py`).
 
-## Receiver with a "--" display (2026-11-21 18:00, read-only)
+## Receiver with a "--" display (2026-11-21 18:00–18:08, read-only)
 
-One old receiver (no `trans`) shows "--" on its front display and ignores the ID button: after
-four presses `/customer/config_file` stayed `CH02`, the player was not restarted and the kernel
-log stayed silent. The rest works: `rtspclient` runs, joins 239.1.1.1 (IGMPv3), the decoder
-allocates frames. `rtspclient` holds `/dev/ttyS1` open, so the display and button are most likely
-a separate front-panel microcontroller on that UART; "--" plus a dead button points at that link
-or that panel, not the network or the firmware (its software is byte-identical to the other old
-receiver). Not probed further: reading ttyS1 would steal bytes from the player.
-Same unit also logs "Check Edid Data Fail" (nothing answering on its HDMI) and "not support
-scaling up ... src 1280x720" (stream 720p, settings ask 1080p).
+One old receiver (no `trans`) shows "--" on its front display at all times. Its ID button works
+(owner: two presses move it from 01 to 03; `/customer/config_file` then reads `CH02`), its player
+runs and joins 239.1.1.1, and with the old transmitter set to 03 it showed that picture on
+its monitor. So only the digit display is faulty. `rtspclient` holds `/dev/ttyS1` open, so the
+display is probably on a front-panel controller reached over that UART (not probed: reading the
+port would steal the player's bytes).
+
+What looked like faults but were not:
+- "Check Edid Data Fail": no HDMI cable yet; with a monitor it logged hot-plug and "EDID OK".
+- "No TX signal" on channel 02: the stored channel counts from zero. `CH02` is display 03 and
+  listens on port 4402 (transmitter at .12); the transmitter "5" at .14 stores `CH04`. Display n =
+  stored n−1 = address .(9+n) = video port 4399+n.
+- Two transmitters both set to 02 shared address .11 and port 4401 (telnet reset, streams mixed).
+- "not support scaling up ... src 1280x720": logged, yet the 720p picture showed.

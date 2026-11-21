@@ -155,7 +155,11 @@ packets, which is why the container raises the network card's receive ring to 40
 ## Network
 
 The extenders use a fixed network: transmitters at 192.168.167.(9 + ID), the receiver at
-192.168.167.90, all in 192.168.167.0/24. This cannot be changed. The gateway needs:
+192.168.167.90, all in 192.168.167.0/24. This cannot be changed. "ID" here is the number on the
+unit's front display (01–16); the units store it counting from zero (`/customer/config_file`
+reads `CH04` on a unit showing 05), so a receiver showing 03 listens to the transmitter at .12
+on port 4402. Two transmitters set to the same number share one address and one video port, and
+their pictures mix. The gateway needs:
 
 - **The same network segment as the extenders.** Its port must be in the same
   [VLAN](https://en.wikipedia.org/wiki/VLAN) /
@@ -355,7 +359,7 @@ and `rx/ir.py` explains how to capture it. See also
 | HDMI input | **ITE IT6616** HDMI receiver (`it6616_MIPI.ko`, 4-lane MIPI CSI into the SoC) | HDMI output chip not identified |
 | Software | Linux 4.9.84, BusyBox 1.20.2, SigmaStar MI SDK pipeline VIF → VPE → VENC (H.265) plus I2S audio, encoder app `hdmi_convertor` (named after a SigmaStar SDK demo) | Linux 4.9.84 SMP, player app `rtspclient` |
 | Flash layout | `BOOT / KERNEL / rootfs / miservice / customer` (vendor app in the writable JFFS2 `customer` partition) | same |
-| Network | Fixed IP 192.168.167.(9 + ID), MAC `00:70:33:00:00:<ID>`, model label on the case like `HKE12MMA20-TX` (the units' own host name is `(none)`), telnet root without password | **Every receiver** uses 192.168.167.90 and MAC `00:70:33:00:00:02`, whatever its channel (two receivers on channels 2 and 6 both answered with them), telnet root without password |
+| Network | Fixed IP 192.168.167.(9 + ID), MAC `00:70:33:00:00:` + the address's last number written as digits (`…:14` at .14), model label on the case like `HKE12MMA20-TX` (the units' own host name is `(none)`), telnet root without password | **Every receiver** uses 192.168.167.90 and MAC `00:70:33:00:00:02`, whatever its channel (two receivers on channels 2 and 6 both answered with them), telnet root without password |
 
 The same design (ITE IT6616 → MIPI CSI → SoC video encoder) appears in patent CN115396725A on a
 Rockchip RV1126; that is a design pattern, not evidence of who made these boards. Earlier HDMI-over-IP
@@ -447,6 +451,9 @@ ours; TESmart does not define the term.
   one TESmart upgrades; with the suffix it is the new version. That is the owner's finding from
   TESmart's confirmation of which units need upgrading, not TESmart's published rule. Check the
   label first, the sticker date second, and ask TESmart if the two disagree.
+
+- **Old with old works too:** an old receiver showed the picture of the old (suffixless) transmitter
+  once both were on the same number (2026-11-21).
 
 Details: [docs/firmware-internals.md](docs/firmware-internals.md).
 
