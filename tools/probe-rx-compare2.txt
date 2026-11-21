@@ -1,0 +1,4 @@
+echo DEMO; cat /customer/demo.sh; echo ENDDEMO
+ls -la /customer /customer/hdmiplayer
+cat /proc/cpuinfo | grep -i -E "hardware|revision|serial" 
+cat /proc/cmdline

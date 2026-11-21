@@ -20,12 +20,12 @@ MAC is `00:70:33:00:00:<ID>`, where `<ID>` is the device's communication ID.
 | TX   | .10 (ID1)     | 10             | —                       | SigmaStar SSC337 |
 | TX2  | .11 (ID2)     | 11             | #5  PREEMPT 2021-03-11  | SigmaStar SSC337 (SStar, ARMv7 Cortex-A7, single core) |
 | TX5  | .14 (ID5)     | 14             | #5  PREEMPT 2021-03-11  | same, **byte-identical firmware to TX2** |
-| RX   | .90 (ID2 tgt) | 02             | #11 **SMP** 2022-04-13  | SigmaStar, **dual-core** (newer build) |
+| RX   | .90 (every RX) | 02 (every RX, any channel; see 2026-11-21 below) | #11 **SMP** 2022-04-13  | SigmaStar, **dual-core**, probably SSD203 |
 
 - TX5 (`HKE12MMA20-TX`) and TX2 share the **same kernel and the same app config** —
   important for the truncation diagnosis below.
-- RX runs a newer, SMP kernel — this is the "new-version vs old-version"
-  difference the vendor warns about (IGMP/stack differs between build vintages).
+- RX runs a newer, SMP kernel. (Corrected 2026-11-21: this is NOT the vendor's old/new
+  difference; an old and a new receiver run the same kernel, see the side-by-side section.)
 - Common to all: Linux 4.9.84, BusyBox 1.20.2, ~44 MB RAM, flash MTD layout
   `BOOT / KERNEL / rootfs / miservice / customer`. The vendor app lives in the
   `customer` partition (JFFS2, writable). No version string file anywhere; the
@@ -435,3 +435,31 @@ https://manuals.plus/tesmart/hdk404-p23-kvm-switch-manual (read 2026-11-20).
 - **Next measurement that would settle it (read-only):** an old-revision receiver and a
   new-revision receiver compared side by side: `md5sum` of `rtspclient` and its ini,
   `/proc/net/igmp`, and a `tcpdump igmp` while each one boots (its join on the wire).
+
+## Old and new receiver side by side (2026-11-21 17:44 EET, read-only)
+
+Two receivers on one switch, one without and one with the update service (the owner's old and
+new units), probed read-only with `tools/probe-rx-compare.txt` (raw output kept privately).
+
+| | Receiver without `trans` | Receiver with `trans` |
+|---|---|---|
+| Kernel | 4.9.84 #11 SMP PREEMPT 2022-04-13 | same |
+| CPU | 2 × ARMv7 rev 5, "SStar Soc" | same |
+| `rtspclient` md5 | 7fa2a6c9 | same |
+| `RTSP_CLIENT_*.ini`, `preview`, `run*.sh` | same md5s | same |
+| `demo.sh` | d3576bf0 | 31db4001: two extra lines, `cd /customer` and `./trans &` |
+| `/customer/trans` | absent | f94552d5 (as on the 12/2025 transmitters) |
+| IGMP (`/proc/net/igmp`) | V3, joined 239.1.1.1 | same |
+| Listening | tcp 23; udp 239.1.1.1:43xx/44xx | adds tcp 9981, udp 9980 |
+| Channel / MAC / IP | CH02 / 00:70:33:00:00:02 / .90 | **CH06** / 00:70:33:00:00:02 / .90 |
+
+- **Receivers do not take a channel-based MAC.** Both answer as 192.168.167.90 with MAC
+  `00:70:33:00:00:02` on different channels; the earlier "RX MAC last octet = target ID" note
+  above was a coincidence of the RX being on channel 2. An ARP request got two identical replies,
+  and telnet reached whichever unit last moved the MAC on the switch.
+- **Conclusion for old vs new:** on both sides (transmitters 2026-11-20, receivers now) the only
+  software difference between the owner's old and new units is the `trans` update service. The
+  IGMP behaviour TESmart's FAQ attributes to the new version is already present on the old units.
+- The receiver's start script is `run.eth0.dhcp.203.ip.sh` where the transmitters' is
+  `run.eth0.dhcp.337.ip.sh` (SSC337), so the receiver SoC is probably a SigmaStar SSD203
+  (dual Cortex-A7). Inferred from the name only.

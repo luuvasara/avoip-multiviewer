@@ -183,6 +183,10 @@ The extenders use a fixed network: transmitters at 192.168.167.(9 + ID), the rec
   `WEBRTC_ADDITIONAL_HOSTS` (an address they can reach) and, if UDP is blocked,
   `WEBRTC_TCP_ADDRESS`.
 - **Broadcasts:** only ARP. Neither the extenders nor the gateway use broadcast discovery.
+- **All receivers share one address.** Every receiver answers as 192.168.167.90 with MAC
+  `00:70:33:00:00:02`, so with two or more, switches see that MAC move between ports and ARP gets
+  several replies. Video is unaffected (it is multicast), but reaching one particular receiver by
+  address (telnet, ping) hits whichever spoke last. The gateway never needs to reach a receiver.
 
 Packet loss shows up as "Degraded" tiles and broken frame counts. The usual causes are a small
 receive ring on the gateway's network card and busy switch ports.
@@ -347,11 +351,11 @@ and `rx/ir.py` explains how to capture it. See also
 
 | Part | Transmitter (TX) | Receiver (RX) |
 |---|---|---|
-| SoC | **SigmaStar SSC337** (SStar), single-core ARM Cortex-A7 (ARMv7), H.265/HEVC hardware encoder; the SSC337DE variant is likely from its ~44 MB of usable memory, not confirmed | SigmaStar, dual-core (SMP kernel); exact chip not identified |
+| SoC | **SigmaStar SSC337** (SStar), single-core ARM Cortex-A7 (ARMv7), H.265/HEVC hardware encoder; the SSC337DE variant is likely from its ~44 MB of usable memory, not confirmed | SigmaStar ("SStar Soc"), dual-core ARMv7; probably the **SSD203**, inferred from its start script `run.eth0.dhcp.203.ip.sh` (the transmitters' is `...337...`), not confirmed |
 | HDMI input | **ITE IT6616** HDMI receiver (`it6616_MIPI.ko`, 4-lane MIPI CSI into the SoC) | HDMI output chip not identified |
 | Software | Linux 4.9.84, BusyBox 1.20.2, SigmaStar MI SDK pipeline VIF → VPE → VENC (H.265) plus I2S audio, encoder app `hdmi_convertor` (named after a SigmaStar SDK demo) | Linux 4.9.84 SMP, player app `rtspclient` |
 | Flash layout | `BOOT / KERNEL / rootfs / miservice / customer` (vendor app in the writable JFFS2 `customer` partition) | same |
-| Network | Fixed IP 192.168.167.(9 + ID), MAC `00:70:33:00:00:<ID>`, host name like `HKE12MMA20-TX`, telnet root without password | 192.168.167.90 |
+| Network | Fixed IP 192.168.167.(9 + ID), MAC `00:70:33:00:00:<ID>`, host name like `HKE12MMA20-TX`, telnet root without password | **Every receiver** uses 192.168.167.90 and MAC `00:70:33:00:00:02`, whatever its channel (two receivers on channels 2 and 6 both answered with them), telnet root without password |
 
 The same design (ITE IT6616 → MIPI CSI → SoC video encoder) appears in patent CN115396725A on a
 Rockchip RV1126; that is a design pattern, not evidence of who made these boards. Earlier HDMI-over-IP
@@ -427,8 +431,13 @@ ours; TESmart does not define the term.
   difference is the factory update service (`trans`, TCP 9981): present on the 12/2025
   transmitters and the receiver, missing on the 11/2024 transmitter. The page calls these builds
   **HW vA** (no update service) and **HW vB** (with it); the letters are ours, not TESmart's.
-- So whatever TESmart's upgrade changes, it is not in the transmitters' video or IGMP code we can
-  see. It may be on the receiver side, in the switch-facing timing of IGMP messages, or something
+- **The receivers are the same story** (old and new receiver side by side, 2026-11-21): the
+  receiver without the update service and the one with it run the same kernel (4.9.84 #11 SMP,
+  2022-04-13), the same player program `rtspclient` (md5 `7fa2a6c9`), the same settings files, and
+  the same IGMP: both join 239.1.1.1 with IGMP version 3. Their start scripts differ by exactly
+  two lines, `cd /customer` and `./trans &`, which start the update service.
+- So whatever TESmart's upgrade changes, it is not in the video, player or IGMP code of either
+  side that we can see. It may be on the receiver side, in the switch-facing timing of IGMP messages, or something
   delivered later through the update service. Not determined.
 - The sticker rule and TESmart's own judgement may not agree: by the rule all our units, 11/2024
   included, are "new version". Ask TESmart with the sticker date if unsure.
