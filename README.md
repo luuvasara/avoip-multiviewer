@@ -355,7 +355,7 @@ and `rx/ir.py` explains how to capture it. See also
 | HDMI input | **ITE IT6616** HDMI receiver (`it6616_MIPI.ko`, 4-lane MIPI CSI into the SoC) | HDMI output chip not identified |
 | Software | Linux 4.9.84, BusyBox 1.20.2, SigmaStar MI SDK pipeline VIF → VPE → VENC (H.265) plus I2S audio, encoder app `hdmi_convertor` (named after a SigmaStar SDK demo) | Linux 4.9.84 SMP, player app `rtspclient` |
 | Flash layout | `BOOT / KERNEL / rootfs / miservice / customer` (vendor app in the writable JFFS2 `customer` partition) | same |
-| Network | Fixed IP 192.168.167.(9 + ID), MAC `00:70:33:00:00:<ID>`, host name like `HKE12MMA20-TX`, telnet root without password | **Every receiver** uses 192.168.167.90 and MAC `00:70:33:00:00:02`, whatever its channel (two receivers on channels 2 and 6 both answered with them), telnet root without password |
+| Network | Fixed IP 192.168.167.(9 + ID), MAC `00:70:33:00:00:<ID>`, model label on the case like `HKE12MMA20-TX` (the units' own host name is `(none)`), telnet root without password | **Every receiver** uses 192.168.167.90 and MAC `00:70:33:00:00:02`, whatever its channel (two receivers on channels 2 and 6 both answered with them), telnet root without password |
 
 The same design (ITE IT6616 → MIPI CSI → SoC video encoder) appears in patent CN115396725A on a
 Rockchip RV1126; that is a design pattern, not evidence of who made these boards. Earlier HDMI-over-IP
@@ -439,8 +439,11 @@ ours; TESmart does not define the term.
 - So whatever TESmart's upgrade changes, it is not in the video, player or IGMP code of either
   side that we can see. It may be on the receiver side, in the switch-facing timing of IGMP messages, or something
   delivered later through the update service. Not determined.
-- The sticker rule and TESmart's own judgement may not agree: by the rule all our units, 11/2024
-  included, are "new version". Ask TESmart with the sticker date if unsure.
+- **The sticker rule and TESmart's own judgement disagree.** Our 11/2024 units carry the full model
+  label **HKE12MMA20** (the earlier name), and TESmart confirmed these need its upgrade, yet by the
+  FAQ's rule (after June 2024 = new) they would be "new version". In this set the model name on the
+  label, not the sticker date, tells old from new. If unsure, ask TESmart with both the label and
+  the sticker date.
 
 Details: [docs/firmware-internals.md](docs/firmware-internals.md).
 

@@ -208,6 +208,8 @@ class Matrix:
     # date here when another unit is checked, to narrow the changeover window.
     STICKERS = {("4465df48", None): "11/2024",          # TX4, 192.168.167.13
                 ("4465df48", "f94552d5"): "12/2025"}    # TX2 and TX5
+    # Model name printed on the units' labels, where the owner has read it.
+    LABELS = {("4465df48", None): "HKE12MMA20"}         # the 11/2024 units
     VARIANT_KEYS = ("role", "kernel", "kernel_build", "kernel_date", "smp", "app_md5", "upd_md5")
 
     def _variant(self, st):
@@ -337,6 +339,7 @@ class Matrix:
         if st:
             out["variant"] = self._variant(st)
             out["sticker"] = self.STICKERS.get((st.get("app_md5"), st.get("upd_md5")))
+            out["label"] = self.LABELS.get((st.get("app_md5"), st.get("upd_md5")))
         if live:
             out.update(live)
             out["age"] = round(time.monotonic() - self.info_at.get(n, 0), 1)

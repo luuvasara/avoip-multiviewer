@@ -22,7 +22,7 @@ MAC is `00:70:33:00:00:<ID>`, where `<ID>` is the device's communication ID.
 | TX5  | .14 (ID5)     | 14             | #5  PREEMPT 2021-03-11  | same, **byte-identical firmware to TX2** |
 | RX   | .90 (every RX) | 02 (every RX, any channel; see 2026-11-21 below) | #11 **SMP** 2022-04-13  | SigmaStar, **dual-core**, probably SSD203 |
 
-- TX5 (`HKE12MMA20-TX`) and TX2 share the **same kernel and the same app config** —
+- TX5 (case label `HKE12MMA20-TX`; the unit's host name is `(none)`) and TX2 share the **same kernel and the same app config** —
   important for the truncation diagnosis below.
 - RX runs a newer, SMP kernel. (Corrected 2026-11-21: this is NOT the vendor's old/new
   difference; an old and a new receiver run the same kernel, see the side-by-side section.)
@@ -463,3 +463,11 @@ new units), probed read-only with `tools/probe-rx-compare.txt` (raw output kept 
 - The receiver's start script is `run.eth0.dhcp.203.ip.sh` where the transmitters' is
   `run.eth0.dhcp.337.ip.sh` (SSC337), so the receiver SoC is probably a SigmaStar SSD203
   (dual Cortex-A7). Inferred from the name only.
+
+### Labels (owner's reading, 2026-11-21)
+
+The 11/2024 units are labelled with the full model name **HKE12MMA20** (TESmart's earlier name for
+the HKE120-EH23), and these are the units TESmart confirmed need the upgrade, although their sticker
+date is after June 2024, which the FAQ's rule calls "new". So the label, not the sticker date,
+separates old from new in this set. The page shows the label in the hardware-variant tooltip
+(`LABELS` in `webclient/gateway.py`).

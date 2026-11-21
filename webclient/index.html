@@ -271,6 +271,9 @@ function renderInfo(t, info, diffs) {
       `For older units TESmart says "we will upgrade your old version of the product for free" (FAQ linked in the footer). ` +
       `Old and new revisions still work together when IGMP snooping is off on the switches, because the video then reaches every port.`
     : "Factory sticker date: not recorded for this build yet (the unit cannot report it; check the sticker)");
+  if (info.label) L.push(`Model label on units of this build: ${info.label} (TESmart's earlier name for the HKE120-EH23). ` +
+    `The owner's units with this label and the 11/2024 sticker are the ones TESmart said need its free upgrade, ` +
+    `although the FAQ's sticker rule (after June 2024 = new) would call them new.`);
   L.push(`Role: ${info.role === "TX" ? "transmitter (sends HDMI)" : info.role === "RX" ? "receiver (drives a display)" : "unknown"}`);
   if (info.channel != null) L.push(info.role === "RX"
       ? `Receiver is tuned to channel ${info.channel}`
