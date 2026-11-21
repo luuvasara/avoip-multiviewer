@@ -475,6 +475,19 @@ Corrected 2026-11-21 17:56 after comparing the units side by side:
 
 Both carry the earlier model name, so the name alone does not separate old from new (an earlier
 note here said it did; wrong). TESmart said the owner's older units need the upgrade, yet the
-FAQ's rule calls 11/2024 "new". Whether the missing "-TX" suffix marks the old revision is not
-decidable from two units. The page shows the label in the hardware-variant tooltip (`LABELS` in
+FAQ's rule calls 11/2024 "new". Owner, 2026-11-21 17:59: **the missing suffix marks the old
+version** (the suffixless unit is one TESmart confirmed needs the upgrade). So in practice: label
+"HKE12MMA20" = old, "HKE12MMA20-TX/-RX" = new; the sticker date rule mis-sorts the 24/11 unit. The page shows the label in the hardware-variant tooltip (`LABELS` in
 `webclient/gateway.py`).
+
+## Receiver with a "--" display (2026-11-21 18:00, read-only)
+
+One old receiver (no `trans`) shows "--" on its front display and ignores the ID button: after
+four presses `/customer/config_file` stayed `CH02`, the player was not restarted and the kernel
+log stayed silent. The rest works: `rtspclient` runs, joins 239.1.1.1 (IGMPv3), the decoder
+allocates frames. `rtspclient` holds `/dev/ttyS1` open, so the display and button are most likely
+a separate front-panel microcontroller on that UART; "--" plus a dead button points at that link
+or that panel, not the network or the firmware (its software is byte-identical to the other old
+receiver). Not probed further: reading ttyS1 would steal bytes from the player.
+Same unit also logs "Check Edid Data Fail" (nothing answering on its HDMI) and "not support
+scaling up ... src 1280x720" (stream 720p, settings ask 1080p).

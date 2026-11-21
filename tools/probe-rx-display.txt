@@ -1,0 +1,9 @@
+echo UP=$(cut -d. -f1 /proc/uptime)
+echo CH=$(cat /customer/config_file)
+ps
+netstat -lnu
+cat /proc/net/igmp
+ls -la /customer/hdmiplayer
+dmesg | tail -40
+ls /dev | grep -i -E "gpio|led|i2c|spi|tm16|seg"
+ls /sys/class/gpio /sys/class/leds 2>/dev/null

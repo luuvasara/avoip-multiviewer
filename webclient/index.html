@@ -272,8 +272,8 @@ function renderInfo(t, info, diffs) {
       `Old and new revisions still work together when IGMP snooping is off on the switches, because the video then reaches every port.`
     : "Factory sticker date: not recorded for this build yet (the unit cannot report it; check the sticker)");
   if (info.label) L.push(`Model label on the owner's unit of this build: "${info.label}" (HKE12MMA20 is TESmart's earlier name for the HKE120-EH23; ` +
-    `the 11/2024 unit has no suffix, the 12/2025 unit reads "-TX"). TESmart said the owner's older units need its free upgrade, ` +
-    `although by the FAQ's sticker rule (after June 2024 = new) 11/2024 would be new.`);
+    `no suffix = old version, "-TX"/"-RX" = new version, per the owner's units TESmart confirmed). ` +
+    `The FAQ's sticker rule (after June 2024 = new) would call the 11/2024 old unit new, so check the label first.`);
   L.push(`Role: ${info.role === "TX" ? "transmitter (sends HDMI)" : info.role === "RX" ? "receiver (drives a display)" : "unknown"}`);
   if (info.channel != null) L.push(info.role === "RX"
       ? `Receiver is tuned to channel ${info.channel}`

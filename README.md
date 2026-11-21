@@ -443,8 +443,10 @@ ours; TESmart does not define the term.
   label: the 12/2025 one reads **HKE12MMA20-TX**, the 11/2024 one plain **HKE12MMA20** (no
   suffix). TESmart said our older units need its upgrade, yet by the FAQ's rule (after June 2024
   = new) 11/2024 would be "new version", so the rule and TESmart's judgement disagree here.
-  Whether the missing "-TX" suffix marks the old revision we cannot tell from two units. If unsure,
-  ask TESmart with the full label and the sticker date.
+  **The suffix is the tell:** a model label without "-TX" (or "-RX") marks the old version, the
+  one TESmart upgrades; with the suffix it is the new version. That is the owner's finding from
+  TESmart's confirmation of which units need upgrading, not TESmart's published rule. Check the
+  label first, the sticker date second, and ask TESmart if the two disagree.
 
 Details: [docs/firmware-internals.md](docs/firmware-internals.md).
 
