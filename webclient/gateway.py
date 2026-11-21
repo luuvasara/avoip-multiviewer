@@ -44,6 +44,11 @@ GROUP = "239.1.1.1"
 IDS = range(1, 17)
 PROBE_PORT = 9        # discard: nothing listens there on the units (netstat, 2026-11-20)
 PROBE_EVERY = 5       # seconds between presence sweeps
+# A channel is listed only after its signal has lasted DISCOVER_S (a transmitter
+# whose ID button is being cycled visits every channel for a moment) and is
+# dropped FORGET_S after the last sign of it (a unit moved to another channel).
+DISCOVER_S = float(os.environ.get("DISCOVER_S", 5))
+FORGET_S = float(os.environ.get("FORGET_S", 60))
 UNWANTED_GRACE = 30   # s a feed keeps running after its last viewer left or hid
 INFO_EVERY = 30      # seconds between telnet info reads per present unit
 WAKE_GAP = 2          # seconds between wake taps per transmitter
@@ -85,6 +90,9 @@ class Matrix:
         self.status_dir = status_dir
         self.last, self.src, self.pkts = {}, {}, {}
         self.present = {}     # n -> monotonic time the unit last answered a probe
+        self.run_since = {}   # n -> start of the current unbroken run of video packets
+        self.probe_since = {} # n -> start of the current unbroken run of probe answers
+        self.listed = {}      # n -> last time the channel met the DISCOVER_S test
         self.info = {}        # n -> live values (uptime, cpu, memory, channel)
         self.info_at = {}     # n -> monotonic time of that read
         # n -> facts that only change on reboot/reflash (role, kernel, firmware
@@ -176,7 +184,10 @@ class Matrix:
         try:
             while True:
                 _, addr = s.recvfrom(2048)
-                self.last[n] = time.monotonic()
+                now = time.monotonic()
+                if n not in self.last or now - self.last[n] > self.stale:
+                    self.run_since[n] = now
+                self.last[n] = now
                 self.src[n] = addr[0]
                 self.pkts[n] = self.pkts.get(n, 0) + 1
         except BlockingIOError:
@@ -222,6 +233,8 @@ class Matrix:
                 now = time.monotonic()
                 for n, ok in zip(IDS, up):
                     if ok:
+                        if n not in self.present or now - self.present[n] > 2 * PROBE_EVERY + 1:
+                            self.probe_since[n] = now
                         if n not in self.present:
                             print(f"tx {n}: present at {tx_ip(n)}", flush=True)
                         self.present[n] = now
@@ -326,7 +339,7 @@ class Matrix:
         not answer keeps its last reading, whose age the page shows."""
         while True:
             if not self.asleep:
-                due = [n for n in IDS if self.is_present(n)
+                due = [n for n in IDS if self.is_present(n) and self.shown(n)
                        and time.monotonic() - self.info_at.get(n, 0) > INFO_EVERY]
                 if due:
                     await asyncio.gather(*(self._read_unit(n) for n in due))
@@ -389,6 +402,22 @@ class Matrix:
         else:
             out["age"] = None           # static facts from the cache, no live read yet
         return out
+
+    def shown(self, n):
+        """Listed on the page: its video or its probe answers have lasted DISCOVER_S
+        without a break, and the last such moment is under FORGET_S ago."""
+        now = time.monotonic()
+        steady = ((self.active(n) and now - self.run_since.get(n, now) >= DISCOVER_S) or
+                  (self.is_present(n) and now - self.probe_since.get(n, now) >= DISCOVER_S))
+        if steady:
+            self.listed[n] = now
+            return True
+        if n in self.listed and now - self.listed[n] < FORGET_S:
+            return True
+        if n in self.listed:
+            del self.listed[n]
+            print(f"tx {n}: gone for {FORGET_S:.0f} s, no longer listed", flush=True)
+        return False
 
     def is_present(self, n):
         """Answered a probe recently, or is sending video (which proves it too)."""
@@ -567,7 +596,7 @@ async def feeds(request):
     if request.query.get("bg") != "1":    # a hidden tab's poll must not keep it awake
         m.touch()
     out = []
-    for n in sorted(set(m.last) | set(m.present)):
+    for n in sorted(n for n in set(m.last) | set(m.present) if m.shown(n)):
         out.append({"id": n, "tx": m.src.get(n, tx_ip(n)), "active": m.active(n),
                     "running": m.running(n), "present": m.is_present(n),
                     # null = no video seen since the gateway started

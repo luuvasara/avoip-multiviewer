@@ -110,8 +110,11 @@ The gateway uses two independent signals:
    (192.168.167.10–25). A unit that is up answers with an ICMP "port unreachable", which marks it
    present. Nothing on the unit is contacted beyond that.
 
-A transmitter appears on the page within about 5 s of either signal and stays listed until the
-gateway restarts. Its tile then reports what it is doing (see the table above). The hardware
+A transmitter appears on the page once either signal has lasted 5 s without a break
+(`DISCOVER_S`) and disappears 60 s after the last sign of it (`FORGET_S`). The threshold matters
+because a transmitter whose ID button is pressed through its numbers stops on every channel for a
+moment; without it all 16 channels would flash onto the page. The time-out clears a channel a
+unit has left. Its tile then reports what it is doing (see the table above). The hardware
 receiver (192.168.167.90) is not listed. Unit details are read every 30 s over the unit's telnet
 port, read-only.
 
@@ -228,6 +231,8 @@ setting with an example.
 | `LISTEN` | `0.0.0.0:8820` | Page address; `127.0.0.1:8820` when the proxy runs on the same host |
 | `HOST_NAME` | `gateway` | Name of this host in the page header |
 | `OCR_LANG` | `eng` | Tesseract language(s) for Copy text, ex. `eng+fin` (install the language pack) |
+| `DISCOVER_S` | `5` | How long a channel's video or presence must last before it is listed (filters a transmitter being clicked through its numbers) |
+| `FORGET_S` | `60` | How long after the last sign of a transmitter its channel is removed from the page |
 | `IGMP_REFRESH_S` | `60` | Re-announce the gateway's multicast join every so many seconds (0 = off). Keeps video flowing through switches that snoop IGMP when no querier is on the network; see [Network](#network) |
 | `TYPE_GAP_MS` | `20` | Pause after each key report when typing text; raise it if characters go missing |
 | `IDLE_SECS` | `120` | Stop everything after this long with no visible page; `0` = never |

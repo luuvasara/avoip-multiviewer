@@ -22,7 +22,7 @@
     <h1 class="bar-title">KVM <span class="bar-sub">multiviewer</span></h1>
   </span>
   <span class="chip" id="count" tabindex="0"
-        title="How transmitters are found: the gateway listens for each transmitter's video multicast (239.1.1.1, UDP 4400–4415 for IDs 1–16) and every 5 s also checks whether something answers at each transmitter address (192.168.167.10–25). A transmitter is listed as soon as either happens, and stays listed until the gateway restarts, with its state on the tile: video, no video (screen blanked, asleep, off or unplugged), or not answering (unpowered or disconnected). The hardware receiver (192.168.167.90) is not listed. While no page is open the gateway stops listening (IDLE_SECS) and finds everything again within about 5 s of the next visit.">
+        title="How transmitters are found: the gateway listens for each transmitter's video multicast (239.1.1.1, UDP 4400–4415 for IDs 1–16) and every 5 s also checks whether something answers at each transmitter address (192.168.167.10–25). A transmitter is listed once either has lasted 5 s (so one being clicked through its ID numbers does not flash onto every channel) and is removed 60 s after the last sign of it, with its state on the tile: video, no video (screen blanked, asleep, off or unplugged), or not answering (unpowered or disconnected). The hardware receiver (192.168.167.90) is not listed. While no page is open the gateway stops listening (IDLE_SECS) and finds everything again within about 5 s of the next visit.">
     <span class="chip-dot" aria-hidden="true"></span><span class="chip-text">— transmitters</span></span>
   <span class="chip" id="host" role="status" tabindex="0" hidden
         title="Load on the machine that runs this multiviewer service"><span class="chip-dot" aria-hidden="true"></span><span class="chip-text"></span></span>
@@ -57,8 +57,8 @@
   <section class="empty" id="empty" aria-live="polite">
     <span class="spinner" aria-hidden="true"></span>
     <p class="empty-title" id="empty-title">Asking the gateway for transmitters…</p>
-    <p class="empty-text">A transmitter appears here as soon as the gateway either receives its video
-      (multicast to 239.1.1.1, UDP 4400–4415) or gets an answer from its address (192.168.167.10–25, checked every 5 s).
+    <p class="empty-text">A transmitter appears here about 5 s after the gateway starts receiving its video
+      (multicast to 239.1.1.1, UDP 4400–4415) or getting answers from its address (192.168.167.10–25, checked every 5 s); the wait keeps a transmitter that is being clicked through its ID numbers from showing up on every channel.
       A transmitter whose computer is asleep sends no video, so the address check is what finds it.
       This page asks the gateway every 3 s.</p>
     <p class="empty-text">Nothing after 10 s? The gateway's network port must be on the same network segment
