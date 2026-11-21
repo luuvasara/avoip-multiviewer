@@ -165,9 +165,11 @@ The extenders use a fixed network: transmitters at 192.168.167.(9 + ID), the rec
   port, as the source of keyboard and mouse packets.
 - **Multicast must reach the gateway.** The extender's manual asks for
   [IGMP snooping](https://en.wikipedia.org/wiki/IGMP_snooping) to be off, so switches flood the
-  multicast to every port. If snooping stays on, the VLAN needs an active
+  multicast to every port. That is also what lets old- and new-revision extenders work together
+  (see [Hardware versions](#hardware-versions)). If snooping stays on, the VLAN needs an active
   [IGMP](https://en.wikipedia.org/wiki/Internet_Group_Management_Protocol) querier, or the
-  switch stops forwarding the groups the gateway joins. Tested with snooping off.
+  switch stops forwarding the groups the gateway joins, and old-revision receivers lose their
+  picture. Tested with snooping off.
 - **A dedicated VLAN is strongly advised.** With snooping off, every transmitter's video goes to
   every port of the VLAN, and the units accept passwordless root telnet logins from anything on
   that network.
@@ -335,7 +337,7 @@ and `rx/ir.py` explains how to capture it. See also
 | Name | Status |
 |---|---|
 | **TESmart HKE120-EH23** "120M HDMI KVM Extender Many to Many 1080P60Hz over CAT5/6" | Tested: 3 transmitters (made 11/2024 and 12/2025) and 1 receiver |
-| **TESmart HKE12MMA20**, the same product's earlier name ([TESmart](https://support.tesmart.com/hc/en-us/articles/26641473432601-HKE120-EH23-Previously-Named-HKE12MMA20): "HKE120-EH23 (Previously Named HKE12MMA20)"); also printed as HKF12MMA20 in one manual | Same product; units made before June 2024 are the "old version", untested (see [Hardware versions](#hardware-versions)) |
+| **TESmart HKE12MMA20**, the same product's earlier name ([TESmart](https://support.tesmart.com/hc/en-us/articles/26641473432601-HKE120-EH23-Previously-Named-HKE12MMA20): "HKE120-EH23 (Previously Named HKE12MMA20)"); also printed as HKF12MMA20 in one manual | Same product. Old and new revisions work together on our network with IGMP snooping off (see [Hardware versions](#hardware-versions)) |
 | **HKE120-EH23-USBK** (listed in the same manual) | Same manual; differences unknown, untested |
 | **TESmart HKE12MMA10**, the older model (apalrd.net, 2022) | Untested; probably the old version |
 | Maker named in the manuals: Tesla Elec Technology Co., Ltd ("Tesla Smart") | |
@@ -353,7 +355,8 @@ viewer, 1080P60 over CAT5e/CAT6 with 16 transmitters and 253 receivers.
 ## Hardware versions
 
 **What TESmart says** (FAQ, updated 2024-12-16,
-https://support.tesmart.com/hc/en-us/articles/41230548979481-HKE120-EH23-FAQ):
+https://support.tesmart.com/hc/en-us/articles/41230548979481-HKE120-EH23-FAQ; full copy with the
+sticker picture in [docs/vendor/tesmart-hke120-eh23-faq.md](docs/vendor/tesmart-hke120-eh23-faq.md)):
 
 > "The new version of HKE120-EH23 supports IGMP authentication. It is possible to utilize more TXs
 > for many-to-many connections on IGMP network switches, and improves the video output stability
@@ -362,30 +365,69 @@ https://support.tesmart.com/hc/en-us/articles/41230548979481-HKE120-EH23-FAQ):
 > "the new version of RX cannot receive the video signal from the old version of TX, and the new
 > version of TX cannot send the video signal to the old version of RX"
 
+> "we will upgrade your old version of the product for free. The upgraded product is compatible
+> with the new version."
+
 > "if the factory date is after June 2024, it is a new version; if it is before June 2024
 > (excluding June), it is an old version."
 
-The date is on the tear-proof sticker over a screw. TESmart upgrades old units for free by return.
-"IGMP authentication" most likely means the new units take part in
-[IGMP](https://en.wikipedia.org/wiki/Internet_Group_Management_Protocol), so switches with IGMP
-snooping forward their multicast; the old manual instead asks for IGMP (snooping) to be turned off.
-That reading is ours: TESmart does not explain the term.
+Both user manuals TESmart publishes for this product (2023-09 and 2024-02) predate the split and
+still say "For normal use, it is necessary to disable the IGMP when connecting to an Ethernet
+switch"; no new-version manual is published. Links and checksums:
+[docs/vendor/manuals.md](docs/vendor/manuals.md).
 
-**What we measured** on four units (2026-11-20): all are "new version" by the sticker rule (11/2024
-and 12/2025). All run the same kernel build and the same encoder program, with the same IGMP setup
-(version 3; the receiver joins 239.1.1.1). The only difference is the factory update service
-(`trans`), present on the 12/2025 units and the receiver and missing on the 11/2024 unit. The page
-names these builds **HW vA** (11/2024, no update service) and **HW vB** (12/2025, with it): letters
-per distinct build, our own labels, not TESmart's. Details: [docs/firmware-internals.md](docs/firmware-internals.md).
+The date is on a tear-proof "QC PASS" seal over a screw: a ring of months 1–12 with two years
+below, and the factory strikes through the month and the year (the FAQ's example is March 2021).
 
-**What it means for this project:**
-- Tested only with new-version units. Old-version (before June 2024) transmitters are untested.
-  TESmart's incompatibility is about IGMP, which matters to a receiver joining the group; the
-  gateway joins with standard Linux IGMP and listens with snooping off, so an old transmitter may
-  work, but that is unverified.
-- With IGMP snooping on, the gateway's own IGMP joins should keep the video flowing to it, as for
-  a new-version receiver, provided the network has an IGMP querier. Also untested; we run with
-  snooping off.
+### What "IGMP authentication" can mean
+
+[IGMP](https://en.wikipedia.org/wiki/Internet_Group_Management_Protocol) is how a device tells the
+network which multicast streams it wants; switches with
+[IGMP snooping](https://en.wikipedia.org/wiki/IGMP_snooping) use those messages to send each
+stream only to the ports that asked for it. IGMP has **no login or authentication step**: the only
+authentication its standard mentions is optional IPsec signing (RFC 3376, section 9.4,
+https://www.rfc-editor.org/rfc/rfc3376), which nothing on these units uses. The FAQ notes it was
+machine-translated ("Translated with www.DeepL.com/Translator"), so "IGMP authentication" most
+likely means **IGMP support**: the new units announce the streams they want, so a snooping switch
+delivers them. Without that, a snooping switch stops sending the video to a receiver that never
+asked, which matches "cannot receive" and "more TXs ... on IGMP network switches". That reading is
+ours; TESmart does not define the term.
+
+### What we measured, and why old and new units still work together here
+
+- **Mixed units work on our network.** We have earlier units that TESmart confirmed need the
+  upgrade, and new-revision units TESmart sent. On our network they work together, receiver and
+  transmitters across revisions, contrary to the FAQ.
+- **Our switches flood multicast.** IGMP snooping is off on every switch (checked 2026-11-20), so
+  every port gets every transmitter's video whether or not anything asked for it. IGMP plays no
+  part, so the difference TESmart describes cannot show. A passive 150 s capture on the extender
+  network (2026-11-21) saw no IGMP query from any switch or router (no
+  [querier](https://en.wikipedia.org/wiki/IGMP_snooping#IGMP_querier)) and no IGMP traffic from
+  the extenders.
+- **The transmitters' video software is identical across revisions.** All three transmitters
+  (stickers 11/2024 and 12/2025) run the same kernel build and the same encoder program (same
+  checksum) and send the same multicast format; all units, the receiver included, use IGMP
+  version 3 with the same settings, and the receiver joins the video group 239.1.1.1. The only
+  difference is the factory update service (`trans`, TCP 9981): present on the 12/2025
+  transmitters and the receiver, missing on the 11/2024 transmitter. The page calls these builds
+  **HW vA** (no update service) and **HW vB** (with it); the letters are ours, not TESmart's.
+- So whatever TESmart's upgrade changes, it is not in the transmitters' video or IGMP code we can
+  see. It may be on the receiver side, in the switch-facing timing of IGMP messages, or something
+  delivered later through the update service. Not determined.
+- The sticker rule and TESmart's own judgement may not agree: by the rule all our units, 11/2024
+  included, are "new version". Ask TESmart with the sticker date if unsure.
+
+Details: [docs/firmware-internals.md](docs/firmware-internals.md).
+
+### What it means for this project
+
+- **Keep IGMP snooping off** on the extenders' VLAN (as the old manual asks). Then old and new
+  units, and this gateway, all get every stream, and the revision does not matter for viewing.
+- **With IGMP snooping on**, the gateway itself announces the streams it wants with standard
+  Linux IGMP (version 3), like a new-version receiver, so it should keep getting video, provided
+  the VLAN has an IGMP querier. Old-version receivers would lose their picture. Untested.
+- Old-version transmitters are untested with the gateway; with snooping off they very likely
+  work, because the receiver path needs nothing from IGMP.
 - vA and vB stream identically. vB adds the open file-write service (see [Security](#security)) and
   spends 18–45 % of the unit's CPU on that service's busy loop, which has not shown up in the video.
 

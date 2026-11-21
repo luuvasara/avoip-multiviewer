@@ -411,3 +411,27 @@ https://manuals.plus/tesmart/hdk404-p23-kvm-switch-manual (read 2026-11-20).
 - Clash: its default leader key Right-Ctrl is also the receiver's and this page's channel hotkey;
   it would have to be reassigned to Scroll Lock or Left-Ctrl.
 - The exact hotkey sequences are in the PDF manual, not read yet.
+
+## Old and new revisions, and what "IGMP authentication" can be (2026-11-21)
+
+- **TESmart's FAQ** (copy: [vendor/tesmart-hke120-eh23-faq.md](vendor/tesmart-hke120-eh23-faq.md))
+  says the new version "supports IGMP authentication", old and new cannot be mixed, and old units
+  are upgraded for free. IGMP has no authentication of its own; RFC 3376 §9.4 only mentions
+  optional IPsec AH. The FAQ is DeepL-translated, so the likely meaning is "IGMP support"
+  (receivers announce their groups, so snooping switches forward the video to them).
+- **Owner's units:** TESmart confirmed the owner's earlier units need the upgrade and sent
+  new-revision units. Old and new work together on this network.
+- **Why they still work together here:** IGMP snooping is off on every switch (2026-11-20), so
+  239.1.1.1 floods to all ports. A passive 150 s `tcpdump igmp` on the extender network
+  (2026-11-21 17:25) saw no IGMP query (no querier) and no IGMP from 192.168.167.x; only an
+  unrelated LAN host's mDNS joins. With no querier, hosts report only when they join, so the
+  receiver's boot-time join of 239.1.1.1 (seen in its `/proc/net/igmp`) was not on the wire.
+- **Measured software differences between revisions** (section "Measured comparison of four
+  units" above): the transmitters' kernel, `hdmi_convertor` (md5 4465df48) and `2M_AUDIO.ini` are
+  identical across the 11/2024 and 12/2025 stickers; IGMP setup identical (v3,
+  `force_igmp_version` 0). Only `trans` (update service) and its `demo.sh` line differ. So the
+  upgrade's change is not visible in the transmitters' video or IGMP code; candidates: the
+  receiver (`rtspclient`), IGMP timing, or a later push through `trans`. Not determined.
+- **Next measurement that would settle it (read-only):** an old-revision receiver and a
+  new-revision receiver compared side by side: `md5sum` of `rtspclient` and its ini,
+  `/proc/net/igmp`, and a `tcpdump igmp` while each one boots (its join on the wire).

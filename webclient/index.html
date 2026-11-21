@@ -71,6 +71,8 @@
 <footer class="foot">
   Switch channel with the buttons above or Right Ctrl, Right Ctrl, then 1–16. This changes this page only;
   the hardware receiver keeps its own channel.
+  <a class="foot-link" href="https://support.tesmart.com/hc/en-us/articles/41230548979481-HKE120-EH23-FAQ" target="_blank" rel="noopener"
+     title="TESmart: units with a factory sticker date before June 2024 are the old version, which cannot be mixed with new ones on IGMP switches. TESmart: &quot;we will upgrade your old version of the product for free&quot;.">Old or new unit? TESmart FAQ</a>
   <a class="foot-ver" id="version" href="https://github.com/luuvasara/avoip-multiviewer" target="_blank" rel="noopener"
      title="Multiviewer version (vYYYY.MM.DD plus a letter per release that day). Opens the project page: setup guide, source and issue tracker."></a>
 </footer>
@@ -265,7 +267,9 @@ function renderInfo(t, info, diffs) {
                            : `; no other ${info.role} variant is connected`));
   L.push(info.sticker
     ? `Factory sticker date seen on this build: ${info.sticker}. Changeover: vA was seen on a 11/2024 unit, vB on 12/2025 units, ` +
-      `so the switch happened between 12/2024 and 12/2025 (exact month unknown). TESmart's own old/new split is June 2024; both variants are after it.`
+      `so the switch happened between 12/2024 and 12/2025 (exact month unknown). TESmart's own old/new split is June 2024; both variants are after it. ` +
+      `For older units TESmart says "we will upgrade your old version of the product for free" (FAQ linked in the footer). ` +
+      `Old and new revisions still work together when IGMP snooping is off on the switches, because the video then reaches every port.`
     : "Factory sticker date: not recorded for this build yet (the unit cannot report it; check the sticker)");
   L.push(`Role: ${info.role === "TX" ? "transmitter (sends HDMI)" : info.role === "RX" ? "receiver (drives a display)" : "unknown"}`);
   if (info.channel != null) L.push(info.role === "RX"

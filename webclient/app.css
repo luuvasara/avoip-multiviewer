@@ -95,7 +95,9 @@
   .notice-text a, .empty-text a { color: var(--color-accent); }
   .foot-ver { color: var(--color-text-muted); font-family: var(--font-mono); font-size: var(--text-sm);
               margin-inline-start: var(--space-md); }
-  .foot-ver:hover, .foot-ver:focus-visible { color: var(--color-accent); }
+  .foot-link { color: var(--color-text-muted); margin-inline-start: var(--space-md); }
+  .foot-ver:hover, .foot-ver:focus-visible,
+  .foot-link:hover, .foot-link:focus-visible { color: var(--color-accent); }
 
   .stage { flex: 1; min-height: 0; overflow: auto; padding: var(--space-md); }
 
